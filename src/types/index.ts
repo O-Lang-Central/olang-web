@@ -8,6 +8,7 @@ export interface Resolver {
   description: string;
   tags: string[];
   verified: boolean;
+  status?: "live" | "planned";
   color: string;         // accent hex
   bgColor: string;       // gradient start hex
   initials: string;      // 2-char logo
