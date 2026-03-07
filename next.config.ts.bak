@@ -1,0 +1,17 @@
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  // Enables static export for Vercel
+  // Remove if using Next.js API routes that need Node runtime
+  reactStrictMode: true,
+
+  // Allow Monaco Editor workers
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+    };
+    return config;
+  },
+};
+
+export default nextConfig;

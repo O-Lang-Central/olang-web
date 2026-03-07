@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── GOOGLE FONTS ─────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap');
+
+/* ── CUSTOM BASE ──────────────────────────────────────────────────────────── */
+@layer base {
+  :root {
+    --font-syne:    'Syne', sans-serif;
+    --font-dm-sans: 'DM Sans', sans-serif;
+    --font-dm-mono: 'DM Mono', monospace;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply font-sans text-ink antialiased bg-surface overflow-x-hidden;
+  }
+
+  * {
+    @apply box-border;
+  }
+}
+
+/* ── CUSTOM UTILITIES ─────────────────────────────────────────────────────── */
+@layer utilities {
+  .font-display {
+    font-family: var(--font-syne);
+  }
+
+  /* Text gradient utility */
+  .text-grad-blue {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(90deg, #60a5fa, #818cf8, #c084fc);
+  }
+
+  /* Hero grid background */
+  .bg-hero-grid {
+    background-image:
+      linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  /* Syntax highlight tokens — used in code windows */
+  .t-kw   { @apply text-indigo-400 font-semibold; }
+  .t-fn   { @apply text-blue-400; }
+  .t-str  { @apply text-green-300; }
+  .t-key  { @apply text-purple-400; }
+  .t-val  { @apply text-amber-400; }
+  .t-cm   { @apply text-white/30 italic; }
+  .t-op   { @apply text-white/50; }
+  .t-gov  { @apply text-pink-400 font-semibold; }
+  .t-num  { @apply text-orange-400; }
+
+  /* Scroll reveal */
+  .reveal {
+    @apply opacity-0 translate-y-5 transition-all duration-500 ease-out;
+  }
+  .reveal.visible {
+    @apply opacity-100 translate-y-0;
+  }
+}
+
+/* ── SCROLLBAR ────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #c9cdd8; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+/* ── CODE WINDOW ──────────────────────────────────────────────────────────── */
+.code-window {
+  background: #0d1424;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(26,86,219,0.15);
+}
+
+/* ── MONACO EDITOR OVERRIDE ───────────────────────────────────────────────── */
+.monaco-editor .margin { background: #0d1424 !important; }
+.monaco-editor, .monaco-editor-background { background: #0d1424 !important; }
