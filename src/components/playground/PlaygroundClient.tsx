@@ -376,7 +376,7 @@ export function PlaygroundClient() {
       const execHash = data.audit?.execution_hash ?? fakeHash(JSON.stringify(payload) + now);
 
       // Build safety events — real halt gets a genuine violation block
-      const safetyEvents = isSafetyHalt ? [
+      const safetyEvents: Array<{ type: "allow" | "block" | "warn"; message: string; detail: string; timestamp: string }> = isSafetyHalt ? [
         { type: "allow",   message: "Resolver allowlist check passed",         detail: "allowed_resolvers validated",                        timestamp: now },
         { type: "allow",   message: "PII validation passed",                   detail: `validator: pii_v2 | domain: ${domain}`,              timestamp: now },
         { type: "block",   message: "SAFETY HALT — prohibited intent detected",
