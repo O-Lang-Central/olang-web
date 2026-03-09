@@ -35,14 +35,18 @@ export function RegistryPage() {
         <div className="absolute inset-0 bg-hero-grid opacity-[0.04] pointer-events-none" />
         <div className="max-w-[1160px] mx-auto relative z-10">
           <span className="font-mono text-[11px] tracking-[1.2px] uppercase text-blue-muted block mb-3">
-            Resolver Registry
+            Tool Registry
           </span>
           <h1 className="font-syne text-[42px] font-extrabold tracking-[-1.5px] text-white leading-tight mb-3">
-            Governed resolvers,<br />ready to use
+            Governed tools,<br />ready to use
           </h1>
           <p className="text-white/55 text-[17px] max-w-[520px] leading-relaxed">
-            Every resolver is schema-validated, version-pinned, and signed before listing.
-            Install with <code className="font-mono text-blue-muted bg-white/[0.08] px-1.5 py-0.5 rounded text-[14px]">npm install @o-lang/resolver-name</code>
+            Every tool is schema-validated, version-pinned, and signed before listing.
+            Install with <code className="font-mono text-blue-muted bg-white/[0.08] px-1.5 py-0.5 rounded text-[14px]">npm install @o-lang/tool-name</code>
+          </p>
+          <p className="text-white/30 text-[13px] mt-2 font-mono">
+            In O-Lang, tools are called <span className="text-blue-muted/60">resolvers</span> —{" "}
+            <a href="/docs" className="underline underline-offset-2 hover:text-white/50 transition-colors">learn why in the docs ↗</a>
           </p>
         </div>
       </div>
@@ -56,7 +60,7 @@ export function RegistryPage() {
             </svg>
             <input
               type="text"
-              placeholder="Search resolvers, tags, authors…"
+              placeholder="Search tools, tags, authors…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="border-none outline-none bg-transparent text-[14px] text-ink placeholder:text-ink-5 flex-1 font-sans"
@@ -166,7 +170,7 @@ export function RegistryPage() {
 
           {visible.length === 0 && (
             <div className="col-span-3 text-center py-20 text-ink-5">
-              <p className="text-[16px] font-semibold mb-2">No resolvers found</p>
+              <p className="text-[16px] font-semibold mb-2">No tools found</p>
               <p className="text-[14px]">Try a different search term or filter</p>
             </div>
           )}

@@ -62,7 +62,7 @@ export function HeroSection() {
         className="text-[clamp(16px,2vw,20px)] text-white/65 max-w-[600px] leading-[1.65] mb-10"
       >
         O-Lang is the open orchestration language for governed AI workflows.
-        Declare your resolvers, enforce your intent, audit everything —
+        Declare your tools, enforce your intent, audit everything —
         cryptographically, at the kernel level.
       </motion.p>
 
@@ -106,7 +106,7 @@ export function HeroSection() {
             </div>
             <span className="font-mono text-[12px] text-white/40 ml-1.5">bank-balance.ol</span>
             <div className="ml-auto flex gap-0.5">
-              {["workflow", "resolver", "output"].map((t, i) => (
+              {["workflow", "tools", "output"].map((t, i) => (
                 <span key={t} className={`font-mono text-[11px] px-2.5 py-1 rounded-[5px] cursor-pointer ${i === 0 ? "bg-blue/20 text-blue-muted" : "text-white/35 hover:text-white/60"}`}>{t}</span>
               ))}
             </div>

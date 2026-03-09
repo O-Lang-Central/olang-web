@@ -29,9 +29,9 @@ export function RegistryPreview() {
     <section className="py-24 px-[5%] bg-surface-2" id="registry">
       <div className="max-w-[1160px] mx-auto">
         <SectionHeader
-          eyebrow="Resolver Registry"
-          title={<>Discover and publish<br />governed resolvers</>}
-          subtitle="Every resolver in the registry is schema-validated, version-pinned, and signed. Drop it into any workflow with a single import."
+          eyebrow="Tool Registry"
+          title={<>Discover and publish<br />governed tools</>}
+          subtitle="Every tool in the registry is schema-validated, version-pinned, and signed. Drop it into any workflow with a single import."
         />
 
         {/* Search + filters */}
@@ -42,7 +42,7 @@ export function RegistryPreview() {
             </svg>
             <input
               type="text"
-              placeholder="Search resolvers…"
+              placeholder="Search tools…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="border-none outline-none bg-transparent text-[14px] text-ink placeholder:text-ink-5 flex-1 font-sans"
@@ -82,7 +82,15 @@ export function RegistryPreview() {
                 </div>
                 <div>
                   <p className="font-mono text-[13px] font-medium text-ink leading-tight">{r.name}</p>
-                  <p className="text-[11.5px] text-ink-5 mt-0.5">{r.scope}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-[11px] text-ink-5">{r.scope}</span>
+                    {r.status === "planned" && (
+                      <span className="flex items-center gap-1 text-[10.5px] text-amber-500 font-medium font-mono">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+                        planned
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -95,7 +103,7 @@ export function RegistryPreview() {
                   <span key={t} className="font-mono text-[10.5px] px-1.5 py-0.5 rounded bg-surface-3 text-ink-5 border border-border">{t}</span>
                 ))}
                 <span className="font-mono text-[10.5px] text-ink-5 ml-auto">v{r.version}</span>
-                {r.verified && (
+                {r.verified && r.status !== "planned" && (
                   <span className="flex items-center gap-1 text-[11px] text-green font-medium">
                     <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3"><path d="M2 6l3 3 5-5"/></svg>
                     verified
@@ -112,7 +120,7 @@ export function RegistryPreview() {
             href="/registry"
             className="inline-flex items-center gap-2.5 px-7 py-3 text-[15px] font-semibold text-blue bg-white border-[1.5px] border-blue rounded-[10px] hover:bg-blue-light hover:-translate-y-px transition-all"
           >
-            Browse full registry
+            Browse full tool registry
             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-4 h-4"><path d="M4 10h12M10 4l6 6-6 6"/></svg>
           </Link>
         </div>
