@@ -36,7 +36,7 @@ export function Navbar() {
       <Link href="/" className="flex items-center gap-2.5">
         <div className="w-[34px] h-[34px] rounded-[9px] overflow-hidden shadow-[0_0_16px_rgba(26,86,219,0.4)] flex-shrink-0">
           <Image
-            src="/logo.jpg"
+            src="/olang-logo.png"
             alt="O-Lang"
             width={34}
             height={34}
