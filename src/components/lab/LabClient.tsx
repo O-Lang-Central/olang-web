@@ -371,7 +371,7 @@ function setupMonaco(monaco: typeof import("monaco-editor")) {
       const S = monaco.languages.CompletionItemKind.Snippet;
       const K = monaco.languages.CompletionItemKind.Keyword;
 
-      const items: monaco.languages.CompletionItem[] = [
+      const items = [
         {
           label: "Workflow",
           kind: S,
