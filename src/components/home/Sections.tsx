@@ -8,7 +8,7 @@ import { SectionHeader, Card } from "@/components/ui";
 // ── STATS STRIP ────────────────────────────────────────────────────────────
 export function StatsStrip() {
   const stats = [
-    { num: "3×",   label: "Workflow domains in v1.1" },
+    { num: "4×",   label: "Workflow domains in v1.1" },
     { num: "100%", label: "Cryptographic audit coverage" },
     { num: "0",    label: "Hallucinations in governed scope" },
     { num: "MIT",  label: "Open source license" },
@@ -36,14 +36,14 @@ const HOW_STEPS = [
   {
     n: "1", color: "#1a56db", bg: "#eff6ff",
     icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1a56db" strokeWidth="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
-    title: "Write your workflow",
-    text: "Define steps, tools, and governance rules in a .ol file. Declare what's allowed. Declare what's prohibited. That's your contract.",
+    title: "Wrap your existing tools",
+    text: "Point O-Lang at the tools your LangChain, CrewAI, or custom agents already use. A .ol file declares the allowlist, intent, and prohibitions — your tools don't change.",
   },
   {
     n: "2", color: "#059669", bg: "#f0fdf4",
     icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
-    title: "Kernel enforces governance",
-    text: "The O-Lang kernel validates every tool call against your allowlist, checks intent scope, runs safety filters, and blocks prohibited actions — before execution.",
+    title: "Kernel intercepts every call",
+    text: "The kernel sits between your orchestration layer and your tools. Every call is validated against the allowlist, intent-checked, and safety-filtered — before it reaches the tool. Your framework never knows.",
   },
   {
     n: "3", color: "#7c3aed", bg: "#faf5ff",
@@ -59,8 +59,8 @@ export function HowItWorksSection() {
       <div className="max-w-[1160px] mx-auto">
         <SectionHeader
           eyebrow="How it works"
-          title={<>Governance baked in,<br />not bolted on</>}
-          subtitle="Every O-Lang workflow passes through the kernel — a runtime that validates, governs, and signs every execution before returning output."
+          title={<>A governance layer for<br />the stack you already have</>}
+          subtitle="O-Lang doesn't replace LangChain, CrewAI, or AutoGen. It wraps your existing tool calls with enforcement: allowlists, intent verification, and cryptographic audit — over HTTP, in any language."
         />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-14 reveal">
           {HOW_STEPS.map((s) => (
@@ -110,6 +110,107 @@ export function FeaturesSection() {
   );
 }
 
+// ── ECOSYSTEM ──────────────────────────────────────────────────────────────
+const ECOSYSTEM = [
+  { name: "LangChain",      color: "#1a56db", note: "Wrap chain tool calls with O-Lang governance" },
+  { name: "CrewAI",         color: "#059669", note: "Add allowlists and audit trails to agent crews" },
+  { name: "AutoGen",        color: "#7c3aed", note: "Govern multi-agent conversations and tool use" },
+  { name: "OpenAI Agents",  color: "#d97706", note: "Enforce function call contracts cryptographically" },
+  { name: "LlamaIndex",     color: "#0891b2", note: "Govern retrieval pipelines and query tool calls" },
+  { name: "Custom stacks",  color: "#dc2626", note: "Any HTTP-capable runtime — language-agnostic" },
+];
+
+export function EcosystemSection() {
+  return (
+    <section className="py-24 px-[5%] bg-surface-2" id="ecosystem">
+      <div className="max-w-[1160px] mx-auto">
+        <SectionHeader
+          eyebrow="Ecosystem"
+          title={<>O-Lang doesn&apos;t replace<br />your stack — it governs it</>}
+          subtitle="The single biggest mistake AI infrastructure makes is asking developers to start over. O-Lang sits as a thin, enforceable layer above whatever orchestration you already run."
+        />
+
+        {/* Stack diagram */}
+        <div className="mt-14 mb-10 reveal">
+          <div className="max-w-[640px] mx-auto">
+            <div className="flex flex-col rounded-[16px] overflow-hidden border border-border shadow-sm">
+              <div className="px-6 py-4 bg-surface-3 border-b border-border">
+                <p className="font-mono text-[11px] text-ink-5 uppercase tracking-widest mb-3">your existing orchestration</p>
+                <div className="flex gap-2 flex-wrap">
+                  {["LangChain", "CrewAI", "AutoGen", "Custom agents"].map((f) => (
+                    <span key={f} className="font-mono text-[12px] px-3 py-1.5 rounded-[8px] bg-white border border-border text-ink-4">{f}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center justify-center py-3 bg-white border-b border-border gap-3">
+                <div className="h-px flex-1 bg-border" />
+                <div className="flex items-center gap-2">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="#1a56db" strokeWidth="1.8" className="w-3 h-3"><path d="M8 2v10M4 8l4 4 4-4"/></svg>
+                  <span className="font-mono text-[11px] text-blue font-semibold">tool calls intercepted by O-Lang kernel</span>
+                  <svg viewBox="0 0 16 16" fill="none" stroke="#1a56db" strokeWidth="1.8" className="w-3 h-3"><path d="M8 2v10M4 8l4 4 4-4"/></svg>
+                </div>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+              <div className="px-6 py-4 bg-blue/[0.04] border-b border-blue/20">
+                <p className="font-mono text-[11px] text-blue uppercase tracking-widest mb-3">o-lang kernel — governance layer</p>
+                <div className="flex gap-2 flex-wrap">
+                  {["✓ Allowlist check", "✓ Intent verify", "✓ Safety filter", "✓ Audit + sign"].map((c) => (
+                    <span key={c} className="font-mono text-[12px] px-3 py-1.5 rounded-[8px] bg-blue/8 border border-blue/20 text-blue">{c}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center justify-center py-3 bg-white border-b border-border gap-3">
+                <div className="h-px flex-1 bg-border" />
+                <span className="font-mono text-[11px] text-green font-semibold">governed output + cryptographic audit trail</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+              <div className="px-6 py-4 bg-surface-3">
+                <p className="font-mono text-[11px] text-ink-5 uppercase tracking-widest mb-3">your tools — completely unchanged</p>
+                <div className="flex gap-2 flex-wrap">
+                  {["your-existing-tool", "@o-lang/llm-groq", "any HTTP resolver", "Python · Go · Rust"].map((t) => (
+                    <span key={t} className="font-mono text-[12px] px-3 py-1.5 rounded-[8px] bg-white border border-border text-ink-4">{t}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <p className="text-center text-[13px] text-ink-5 mt-4 leading-relaxed">
+              Your frameworks call tools. O-Lang intercepts those calls, enforces governance, and returns signed output.{" "}
+              <strong className="text-ink font-semibold">Nothing in your existing stack changes.</strong>
+            </p>
+          </div>
+        </div>
+
+        {/* Framework compatibility grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 reveal">
+          {ECOSYSTEM.map((e) => (
+            <div key={e.name} className="bg-white border border-border rounded-[14px] px-5 py-4 flex items-start gap-3 hover:border-border-2 hover:shadow-sm transition-all">
+              <div className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ background: e.color }} />
+              <div>
+                <p className="font-syne font-bold text-[14px] text-ink mb-0.5">{e.name}</p>
+                <p className="text-[13px] text-ink-4 leading-relaxed">{e.note}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* JSON contract callout */}
+        <div className="mt-10 rounded-[14px] bg-[#0f172a] px-8 py-6 flex flex-col md:flex-row items-center justify-between gap-5 reveal">
+          <div>
+            <p className="font-syne font-bold text-[17px] text-white mb-1.5">JSON in, JSON out. That&apos;s the whole contract.</p>
+            <p className="text-white/50 text-[14px] leading-relaxed max-w-[500px]">
+              If your tool speaks JSON, O-Lang can govern it. Python, Go, Rust, Java, Bash, WASM —
+              the kernel is indifferent to language. It only cares about the shape of the data, not who produced it.
+            </p>
+          </div>
+          <a href="/docs#syntax" className="flex-shrink-0 px-5 py-3 bg-blue text-white text-[14px] font-semibold rounded-[10px] hover:opacity-90 transition-opacity whitespace-nowrap">
+            Read the language spec →
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ── DOMAINS ────────────────────────────────────────────────────────────────
 const DOMAINS = [
   {
@@ -130,6 +231,12 @@ const DOMAINS = [
     desc: "Contract extraction, NDA review, clause identification — extract-only mode blocks legal advice output, protecting against unauthorized practice of law.",
     pills: ["Contract review", "Clause extraction", "Jurisdiction compliance"],
   },
+  {
+    key: "iot", label: "IoT & Infrastructure", bg: "#fff7ed", border: "#fed7aa", textBg: "IOT", accent: "#ea580c", gradFrom: "#c2410c",
+    icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/><path d="M15.54 8.46a5 5 0 010 7.07M8.46 8.46a5 5 0 000 7.07"/></svg>,
+    desc: "Device command governance, sensor data pipelines, automated alert routing — with strict tool allowlists preventing unauthorised actuation and real-time audit trails for every device action.",
+    pills: ["Device command workflow", "Sensor alert routing", "Infrastructure monitoring"],
+  },
 ];
 
 export function DomainsSection() {
@@ -139,9 +246,9 @@ export function DomainsSection() {
         <SectionHeader
           eyebrow="Use cases"
           title={<>Governed AI for<br />high-stakes domains</>}
-          subtitle="O-Lang was designed for industries where AI errors are not just inconvenient — they are dangerous, illegal, or catastrophic."
+          subtitle="O-Lang was designed for industries where AI errors are not just inconvenient — they are dangerous, illegal, or catastrophic. Finance. Healthcare. Government. IoT."
         />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-14 reveal">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mt-14 reveal">
           {DOMAINS.map((d) => (
             <div
               key={d.key}

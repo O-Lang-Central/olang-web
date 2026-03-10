@@ -1,5 +1,5 @@
 // ── RESOLVER REGISTRY ──────────────────────────────────────────────────────
-export type ResolverScope = "finance" | "health" | "legal" | "llm" | "utils";
+export type ResolverScope = "finance" | "health" | "legal" | "iot" | "llm" | "utils";
 
 export interface Resolver {
   name: string;          // e.g. "@o-lang/bank-lookup"

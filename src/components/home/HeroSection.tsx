@@ -38,7 +38,7 @@ export function HeroSection() {
       >
         <span className="w-1.5 h-1.5 rounded-full bg-blue-muted shadow-[0_0_0_3px_rgba(96,165,250,0.25)] animate-pulse-ring" />
         <span className="font-mono text-[12px] text-blue-muted tracking-[0.4px]">
-          Open Protocol · MIT Licensed · Global Infrastructure
+          Governance layer · Not a replacement · MIT Licensed
         </span>
       </motion.div>
 
@@ -61,9 +61,9 @@ export function HeroSection() {
         transition={{ duration: 0.55, delay: 0.18 }}
         className="text-[clamp(16px,2vw,20px)] text-white/65 max-w-[600px] leading-[1.65] mb-10"
       >
-        O-Lang is the open orchestration language for governed AI workflows.
-        Declare your tools, enforce your intent, audit everything —
-        cryptographically, at the kernel level.
+        Your LangChain agents, CrewAI workflows, and OpenAI functions already run.
+        O-Lang adds the governance layer they&apos;re missing — tool allowlists, intent enforcement,
+        and cryptographic audit trails. No rewrite required.
       </motion.p>
 
       {/* CTAs */}
@@ -129,8 +129,8 @@ export function HeroSection() {
 
           {/* Language badge strip */}
           <div className="flex items-center gap-2 px-7 py-2.5 border-t border-white/[0.05]" style={{ background: "rgba(255,255,255,0.015)" }}>
-            <span className="font-mono text-[10px] text-white/30 uppercase tracking-widest">runs on</span>
-            {["JavaScript", "Python (beta)", "any language"].map((lang) => (
+            <span className="font-mono text-[10px] text-white/30 uppercase tracking-widest">works with</span>
+            {["LangChain", "CrewAI", "AutoGen", "OpenAI Agents", "any HTTP client"].map((lang) => (
               <span key={lang} className="font-mono text-[10px] px-2 py-0.5 rounded"
                     style={{ color: "rgba(255,255,255,0.45)", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
                 {lang}

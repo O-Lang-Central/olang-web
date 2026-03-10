@@ -11,6 +11,7 @@ const FILTERS: { label: string; value: ResolverScope | "all" }[] = [
   { label: "Finance",    value: "finance" },
   { label: "Healthcare", value: "health" },
   { label: "Legal",      value: "legal" },
+  { label: "IoT",        value: "iot" },
   { label: "LLM",        value: "llm" },
 ];
 
