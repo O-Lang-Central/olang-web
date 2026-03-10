@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { RESOLVERS } from "@/lib/utils";
-import type { ResolverScope } from "@/types";
+import type { Resolver, ResolverScope } from "@/types";
 
 const FILTERS: { label: string; value: ResolverScope | "all" }[] = [
   { label: "All",        value: "all" },
@@ -292,7 +292,7 @@ export function RegistryPage() {
       {/* Grid */}
       <div className="px-[5%] py-10">
         <div className="max-w-[1160px] mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {visible.map((r) => (
+          {visible.map((r: Resolver) => (
             <div
               key={r.name}
               className="bg-white border-[1.5px] border-border rounded-2xl p-6 shadow-sm hover:-translate-y-0.5 hover:shadow-md hover:border-border-2 transition-all cursor-pointer"
@@ -399,7 +399,7 @@ export function RegistryPage() {
                 title: "Earn your certification badge",
                 body: "A certification badge (badge.txt) is generated automatically when all 8 tests pass. Include it in your repo README to confirm O-Lang CERTIFIED status before submitting.",
                 code: "🎉 Resolver is O-Lang CERTIFIED\n🏷️  Badge generated: badge.txt",
-                link: "https://medium.com/@o-lang/how-to-test-o-lang-resolvers-in-python-and-javascript-07e6fab4385f",
+                link: "https://medium.com/@o-lang/olang-resolver-certification-essay",
                 linkLabel: "Read the conformance essay ↗",
               },
               {
