@@ -15,6 +15,7 @@ export interface Resolver {
   downloads?: number;
   author?: string;
   repoUrl?: string;
+  pypi?: boolean;        // ← Added: indicates if resolver is published on PyPI
 }
 
 // ── WORKFLOW EXECUTION ─────────────────────────────────────────────────────
