@@ -1,1034 +1,448 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
-import dynamic from "next/dynamic";
-import type { editor } from "monaco-editor";
-import Link from "next/link";
-import { fakeHash } from "@/lib/utils";
-import type { ExecutionResult } from "@/types";
+import { useState } from "react";
+import { RESOLVERS } from "@/lib/utils";
+import type { Resolver, ResolverScope } from "@/types";
 
-const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
-
-const KERNEL_URL = process.env.NEXT_PUBLIC_KERNEL_URL ?? "http://localhost:3001";
-
-const BG     = "#060c18";
-const PANEL  = "#080f1c";
-const BORDER = "#1a2540";
-const TEXT   = "#e2e8f0";
-const TEXT2  = "#64748b";
-const TEXT3  = "#334155";
-const accent = "#60a5fa";
-const ERR    = "#f87171";
-const WARN   = "#fbbf24";
-const OK     = "#34d399";
-
-type TabId = "customer" | "trace" | "safety" | "audit" | "intent";
-
-const TABS: { id: TabId; label: string }[] = [
-  { id: "customer", label: "Output"  },
-  { id: "trace",    label: "Trace"   },
-  { id: "safety",   label: "Safety"  },
-  { id: "audit",    label: "Audit"   },
-  { id: "intent",   label: "Intent"  },
+const FILTERS: { label: string; value: ResolverScope | "all" }[] = [
+  { label: "All",        value: "all" },
+  { label: "Finance",    value: "finance" },
+  { label: "Healthcare", value: "health" },
+  { label: "Legal",      value: "legal" },
+  { label: "IoT",        value: "iot" },
+  { label: "LLM",        value: "llm" },
+  { label: "Utils",      value: "utils" },
 ];
 
-// ── Blank template uses real verified syntax ───────────────────────────────
-const BLANK_TEMPLATE = `Workflow "My Workflow" with input1
-
-Allow resolvers:
-  GroqLLM
-
-Step 1: Ask GroqLLM "{input1}"
-Save as response
-
-Return response`;
-
-// ── Syntax validation — matched against actual kernel parser ───────────────
-interface SyntaxError {
-  line: number; col: number; endCol: number;
-  message: string; suggestion: string;
-  severity: "error" | "warning";
-}
-
-function validateOLang(code: string): SyntaxError[] {
-  const errors: SyntaxError[] = [];
-  const lines = code.split("\n");
-
-  let hasWorkflow  = false;
-  let hasReturn    = false;
-  let hasAllow     = false;
-  let inAllow      = false;
-  let lastStepNum  = 0;
-  let ifDepth      = 0;
-  let inParallel   = false;
-  let inEscalation = false;
-  const saveAliases: string[] = [];
-
-  lines.forEach((raw, i) => {
-    const line = raw.trimEnd();
-    const lineNum = i + 1;
-    const t = line.trim();
-    if (!t || t.startsWith("#")) return;
-
-    // ── Workflow declaration ──
-    if (/^Workflow\s/i.test(t)) {
-      hasWorkflow = true;
-      inAllow = false;
-      if (!/^Workflow\s+"[^"]+"/.test(t))
-        errors.push({ line: lineNum, col: 1, endCol: t.length, severity: "error",
-          message: "Workflow name must be in double quotes.",
-          suggestion: 'Workflow "My Workflow" with input1, input2' });
-      if (!/\bwith\b/i.test(t))
-        errors.push({ line: lineNum, col: t.length, endCol: t.length, severity: "warning",
-          message: "Workflow has no declared inputs.",
-          suggestion: "Add:  with input_name1, input_name2" });
-      return;
-    }
-
-    // ── Allow resolvers block ──
-    if (/^Allow resolvers:/i.test(t)) {
-      hasAllow = true;
-      inAllow = true;
-      return;
-    }
-
-    // ── Resolver list entries (- Name or bare Name inside allow block) ──
-    if (inAllow && /^-?\s*\S+/.test(t) && !/^(Step|Save|Return|Run|If|End|Debrief|Evolve|Prompt|Persist|Emit|Use|Constraint)\b/i.test(t)) {
-      return; // valid resolver entry
-    }
-
-    // ── Constraint ──
-    if (/^Constraint:\s*/i.test(t)) {
-      inAllow = false;
-      if (!/^Constraint:\s+\S+\s*=\s*\S+/i.test(t))
-        errors.push({ line: lineNum, col: 1, endCol: t.length, severity: "error",
-          message: "Constraint must be in the form: Constraint: key = value",
-          suggestion: "Constraint: max_generations = 5" });
-      return;
-    }
-
-    // ── Step declaration ──
-    const stepMatch = t.match(/^Step\s+(\d+):\s*(.+)$/i);
-    if (stepMatch) {
-      inAllow = false;
-      const num = parseInt(stepMatch[1], 10);
-      if (num <= lastStepNum)
-        errors.push({ line: lineNum, col: 1, endCol: t.length, severity: "error",
-          message: `Step ${num} is out of order — steps must increase monotonically.`,
-          suggestion: `Step ${lastStepNum + 1}: Ask ResolverName "{variable}"` });
-      lastStepNum = num;
-
-      const action = stepMatch[2].trim();
-      if (!/^(Ask|Use)\s+/i.test(action))
-        errors.push({ line: lineNum, col: 1, endCol: t.length, severity: "error",
-          message: 'Step body must start with "Ask" or "Use".',
-          suggestion: `Step ${num}: Ask ResolverName "{input1}"` });
-
-      // Check curly brace balance
-      const open  = (t.match(/\{/g) || []).length;
-      const close = (t.match(/\}/g) || []).length;
-      if (open !== close)
-        errors.push({ line: lineNum, col: 1, endCol: t.length, severity: "error",
-          message: `Unmatched curly brace — ${open > close ? "missing closing }" : "extra }"}`,
-          suggestion: "Every {symbol} needs a matching closing brace." });
-      return;
-    }
-
-    // ── Save as ──
-    if (/^Save as\s*/i.test(t)) {
-      inAllow = false;
-      const alias = t.replace(/^Save as\s*/i, "").trim().split(/\s+/)[0];
-      if (!alias)
-        errors.push({ line: lineNum, col: 1, endCol: t.length, severity: "error",
-          message: '"Save as" must be followed by a variable name.',
-          suggestion: "Save as my_variable" });
-      else if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(alias))
-        errors.push({ line: lineNum, col: 9, endCol: t.length, severity: "error",
-          message: `Variable name "${alias}" is invalid — use letters, numbers, underscores only.`,
-          suggestion: `Save as ${alias.replace(/[^a-zA-Z0-9_]/g, "_")}` });
-      else saveAliases.push(alias);
-      return;
-    }
-
-    // ── Return ──
-    if (/^Return\s+/i.test(t)) {
-      inAllow = false;
-      hasReturn = true;
-      const retVars = t.replace(/^Return\s+/i, "").split(",").map(v => v.trim());
-      retVars.forEach(rv => {
-        if (rv && saveAliases.length && !saveAliases.includes(rv))
-          errors.push({ line: lineNum, col: 8, endCol: t.length, severity: "warning",
-            message: `"${rv}" was not declared with "Save as".`,
-            suggestion: `Return ${saveAliases[saveAliases.length - 1]}` });
-      });
-      return;
-    }
-
-    // ── If block ──
-    if (/^If\s+/i.test(t)) {
-      inAllow = false;
-      ifDepth++;
-      if (!/^If\s+\{[^}]+\}\s+(equals|greater than|less than)\s+/i.test(t))
-        errors.push({ line: lineNum, col: 1, endCol: t.length, severity: "error",
-          message: 'If condition must use: {variable} equals "value"  |  {variable} greater than N  |  {variable} less than N',
-          suggestion: 'If {result.score} greater than 80 then' });
-      return;
-    }
-
-    // ── End If ──
-    if (/^End\s+If$/i.test(t)) {
-      inAllow = false;
-      if (ifDepth === 0)
-        errors.push({ line: lineNum, col: 1, endCol: t.length, severity: "error",
-          message: '"End If" without a matching "If".',
-          suggestion: "Add an If block before End If" });
-      else ifDepth--;
-      return;
-    }
-
-    // ── Run in parallel ──
-    if (/^Run in parallel/i.test(t)) {
-      inAllow = false;
-      inParallel = true;
-      if (/^Run in parallel with escalation/i.test(t)) inEscalation = true;
-      return;
-    }
-
-    // ── Level (inside escalation) ──
-    if (/^Level\s+\d+:/i.test(t)) {
-      if (!inEscalation)
-        errors.push({ line: lineNum, col: 1, endCol: t.length, severity: "error",
-          message: '"Level" can only appear inside a "Run in parallel with escalation:" block.',
-          suggestion: "Run in parallel with escalation:" });
-      return;
-    }
-
-    // ── End (closes parallel/escalation) ──
-    if (/^End$/i.test(t)) {
-      inAllow = false;
-      if (!inParallel)
-        errors.push({ line: lineNum, col: 1, endCol: t.length, severity: "error",
-          message: '"End" without a matching "Run in parallel" block.',
-          suggestion: "Add a Run in parallel block before End" });
-      inParallel   = false;
-      inEscalation = false;
-      return;
-    }
-
-    // ── Debrief ──
-    if (/^Debrief\s+/i.test(t)) {
-      inAllow = false;
-      if (!/^Debrief\s+\S+\s+with\s+"[^"]*"$/i.test(t))
-        errors.push({ line: lineNum, col: 1, endCol: t.length, severity: "error",
-          message: 'Debrief syntax: Debrief AgentName with "message"',
-          suggestion: 'Debrief System with "High risk detected for {account_id}"' });
-      return;
-    }
-
-    // ── Evolve ──
-    if (/^Evolve\s+/i.test(t)) {
-      inAllow = false;
-      if (!/^Evolve\s+\S+\s+using feedback:\s*"[^"]*"$/i.test(t))
-        errors.push({ line: lineNum, col: 1, endCol: t.length, severity: "error",
-          message: 'Evolve syntax: Evolve ResolverName using feedback: "message"',
-          suggestion: 'Evolve GroqLLM using feedback: "Improve accuracy on edge cases"' });
-      return;
-    }
-
-    // ── Prompt user ──
-    if (/^Prompt user to\s+/i.test(t)) {
-      inAllow = false;
-      if (!/^Prompt user to\s+"[^"]*"$/i.test(t))
-        errors.push({ line: lineNum, col: 1, endCol: t.length, severity: "error",
-          message: 'Prompt syntax: Prompt user to "question"',
-          suggestion: 'Prompt user to "Please confirm the account ID"' });
-      return;
-    }
-
-    // ── Persist ──
-    if (/^Persist\s+/i.test(t)) {
-      inAllow = false;
-      if (!/^Persist\s+\S+\s+to\s+"[^"]*"$/i.test(t))
-        errors.push({ line: lineNum, col: 1, endCol: t.length, severity: "error",
-          message: 'Persist syntax: Persist variable to "path"',
-          suggestion: 'Persist result to "./logs/output.json"' });
-      return;
-    }
-
-    // ── Emit ──
-    if (/^Emit\s+/i.test(t)) {
-      inAllow = false;
-      if (!/^Emit\s+"[^"]+"\s+with\s+\S+$/i.test(t))
-        errors.push({ line: lineNum, col: 1, endCol: t.length, severity: "error",
-          message: 'Emit syntax: Emit "event-name" with payload',
-          suggestion: 'Emit "workflow_done" with {result}' });
-      return;
-    }
-
-    // ── Use (tool invocation without prompt) ──
-    if (/^Use\s+\S+$/i.test(t)) {
-      inAllow = false;
-      return;
-    }
-
-    // ── Unrecognised line ──
-    if (!inAllow && t !== "") {
-      errors.push({ line: lineNum, col: 1, endCol: t.length, severity: "warning",
-        message: `Unrecognised statement: "${t.slice(0, 40)}${t.length > 40 ? "…" : ""}"`,
-        suggestion: "Check the O-Lang Syntax reference at /syntax" });
-    }
+// ── Submit Tool Modal ────────────────────────────────────────────────────────
+function SubmitModal({ onClose }: { onClose: () => void }) {
+  const [form, setForm] = useState({
+    name: "", scope: "utils", description: "", repo: "", contact: "", runtime: "node",
   });
+  const [submitted, setSubmitted] = useState(false);
+  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
-  // ── End-of-file checks ──
-  if (!hasWorkflow)
-    errors.push({ line: 1, col: 1, endCol: 1, severity: "error",
-      message: "Missing Workflow declaration.",
-      suggestion: 'Workflow "My Workflow" with input1' });
-  if (!hasAllow && hasWorkflow)
-    errors.push({ line: 2, col: 1, endCol: 1, severity: "error",
-      message: "Missing Allow resolvers: block.",
-      suggestion: "Allow resolvers:\n  GroqLLM" });
-  if (hasWorkflow && !hasReturn)
-    errors.push({ line: lines.length, col: 1, endCol: 1, severity: "warning",
-      message: "Workflow has no Return statement.",
-      suggestion: "Return response" });
-  if (ifDepth > 0)
-    errors.push({ line: lines.length, col: 1, endCol: 1, severity: "error",
-      message: `Unclosed If block — missing ${ifDepth === 1 ? "an" : ifDepth} "End If"`,
-      suggestion: "End If" });
-  if (inParallel)
-    errors.push({ line: lines.length, col: 1, endCol: 1, severity: "error",
-      message: 'Unclosed "Run in parallel" block — missing "End"',
-      suggestion: "End" });
-
-  return errors;
-}
-
-// ── Monaco language + theme setup ─────────────────────────────────────────
-function setupMonaco(monaco: typeof import("monaco-editor")) {
-  const LANG = "olang";
-  if (monaco.languages.getLanguages().find((l) => l.id === LANG)) return;
-
-  monaco.languages.register({ id: LANG, extensions: [".ol"] });
-
-  // Tokeniser — all verified keywords from parser
-  monaco.languages.setMonarchTokensProvider(LANG, {
-    tokenizer: {
-      root: [
-        // Block keywords
-        [/\b(Run in parallel with escalation|Run in parallel for|Run in parallel|End If|End)\b/, "keyword.control"],
-        // Statement keywords
-        [/\b(Workflow|Allow resolvers|Step|Save as|Return|Debrief|Evolve|Prompt user to|Persist|Emit|Use|Constraint|Level)\b/, "keyword"],
-        // Inline keywords
-        [/\b(with|Ask|using feedback|greater than|less than|equals|then|to)\b/, "keyword.inline"],
-        // Resolver names (anything after Ask or Use or Allow block entries)
-        [/(?<=Ask\s|Use\s)[\w@/-]+/, "type"],
-        // Strings
-        [/"[^"]*"/, "string"],
-        // Variables {in braces}
-        [/\{[^}]*\}/, "variable"],
-        // Comments
-        [/#.*$/, "comment"],
-        // Numbers
-        [/\b\d+[smhd]?\b/, "number"],
-      ],
-    },
-  });
-
-  monaco.editor.defineTheme("olang-dark", {
-    base: "vs-dark", inherit: true,
-    rules: [
-      { token: "keyword",         foreground: "818cf8", fontStyle: "bold" },
-      { token: "keyword.control", foreground: "c084fc", fontStyle: "bold" },
-      { token: "keyword.inline",  foreground: "818cf8" },
-      { token: "type",            foreground: "34d399" },
-      { token: "string",          foreground: "fbbf24" },
-      { token: "variable",        foreground: "f472b6" },
-      { token: "comment",         foreground: "475569", fontStyle: "italic" },
-      { token: "number",          foreground: "60a5fa" },
-    ],
-    colors: {
-      "editor.background":              "#060c18",
-      "editor.foreground":              "#e2e8f0",
-      "editor.lineHighlightBackground": "#1a254018",
-      "editorLineNumber.foreground":    "#334155",
-      "editorCursor.foreground":        "#60a5fa",
-      "editor.selectionBackground":     "#1a56db30",
-    },
-  });
-
-  // ── Autocomplete snippets ─────────────────────────────────────────────
-  monaco.languages.registerCompletionItemProvider(LANG, {
-    provideCompletionItems: (model, position) => {
-      const word = model.getWordUntilPosition(position);
-      const range = {
-        startLineNumber: position.lineNumber,
-        endLineNumber:   position.lineNumber,
-        startColumn:     word.startColumn,
-        endColumn:       word.endColumn,
-      };
-
-      const S = monaco.languages.CompletionItemKind.Snippet;
-      const K = monaco.languages.CompletionItemKind.Keyword;
-
-      const items = [
-        {
-          label: "Workflow",
-          kind: S,
-          insertText: 'Workflow "${1:My Workflow}" with ${2:input1}\n\nAllow resolvers:\n  ${3:GroqLLM}\n\nStep 1: Ask ${3:GroqLLM} "{${2:input1}}"\nSave as ${4:response}\n\nReturn ${4:response}',
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: "Full workflow scaffold",
-          range,
-        },
-        {
-          label: "Allow resolvers",
-          kind: S,
-          insertText: "Allow resolvers:\n  ${1:GroqLLM}",
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: "Resolver allowlist block",
-          range,
-        },
-        {
-          label: "Step",
-          kind: S,
-          insertText: 'Step ${1:1}: Ask ${2:ResolverName} "{${3:variable}}"\nSave as ${4:result}',
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: "Execution step with Ask",
-          range,
-        },
-        {
-          label: "Step Use",
-          kind: S,
-          insertText: "Step ${1:1}: Use ${2:ResolverName}\nSave as ${3:result}",
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: "Step with Use (no prompt)",
-          range,
-        },
-        {
-          label: "If equals",
-          kind: S,
-          insertText: 'If {${1:variable}} equals "${2:value}" then\n  Step ${3:N}: Ask ${4:Resolver} "{${5:input}}"\n  Save as ${6:result}\nEnd If',
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: "Conditional: string equality",
-          range,
-        },
-        {
-          label: "If greater than",
-          kind: S,
-          insertText: "If {${1:variable.score}} greater than ${2:80} then\n  Step ${3:N}: Ask ${4:Resolver} \"{${5:input}}\"\n  Save as ${6:result}\nEnd If",
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: "Conditional: numeric greater than",
-          range,
-        },
-        {
-          label: "If less than",
-          kind: S,
-          insertText: "If {${1:variable.count}} less than ${2:5} then\n  Step ${3:N}: Ask ${4:Resolver} \"{${5:input}}\"\n  Save as ${6:result}\nEnd If",
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: "Conditional: numeric less than",
-          range,
-        },
-        {
-          label: "Run in parallel",
-          kind: S,
-          insertText: "Run in parallel\n  Step ${1:1}: Ask ${2:ToolA} \"{${3:input}}\"\n  Save as ${4:result_a}\n\n  Step ${5:2}: Ask ${6:ToolB} \"{${3:input}}\"\n  Save as ${7:result_b}\nEnd",
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: "Parallel execution block",
-          range,
-        },
-        {
-          label: "Run in parallel for (timed)",
-          kind: S,
-          insertText: "Run in parallel for ${1:30}s\n  Step ${2:1}: Ask ${3:ToolA} \"{${4:input}}\"\n  Save as ${5:result_a}\n\n  Step ${6:2}: Ask ${7:ToolB} \"{${4:input}}\"\n  Save as ${8:result_b}\nEnd",
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: "Parallel with timeout",
-          range,
-        },
-        {
-          label: "Run in parallel with escalation",
-          kind: S,
-          insertText: "Run in parallel with escalation:\n\n  Level 1: immediately\n    Step ${1:1}: Ask ${2:AutoResponder} \"{${3:incident_id}}\"\n    Save as response\n\n  Level 2: within ${4:5}m\n    Step ${5:2}: Ask ${6:OnCallEngineer} \"{${3:incident_id}}\"\n    Save as response\n\nEnd",
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: "Escalation block with levels",
-          range,
-        },
-        {
-          label: "Debrief",
-          kind: S,
-          insertText: 'Debrief ${1:System} with "${2:Message for {variable}}"',
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: "Send message to agent",
-          range,
-        },
-        {
-          label: "Evolve",
-          kind: S,
-          insertText: 'Evolve ${1:ResolverName} using feedback: "${2:Feedback message}"',
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: "Request resolver improvement",
-          range,
-        },
-        {
-          label: "Prompt user to",
-          kind: S,
-          insertText: 'Prompt user to "${1:Please confirm before proceeding}"',
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: "Declare a user input step",
-          range,
-        },
-        {
-          label: "Persist",
-          kind: S,
-          insertText: 'Persist ${1:variable} to "${2:./logs/output.json}"',
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: "Write variable to file",
-          range,
-        },
-        {
-          label: "Emit",
-          kind: S,
-          insertText: 'Emit "${1:event_name}" with {${2:variable}}',
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: "Fire a named event",
-          range,
-        },
-        {
-          label: "Constraint (workflow)",
-          kind: S,
-          insertText: "Constraint: max_generations = ${1:5}",
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: "Workflow-level constraint",
-          range,
-        },
-        {
-          label: "Constraint (step)",
-          kind: S,
-          insertText: "Constraint: max_time_sec = ${1:10}",
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          documentation: "Per-step constraint",
-          range,
-        },
-        { label: "Return",    kind: K, insertText: "Return ",    documentation: "Workflow output", range },
-        { label: "Save as",  kind: K, insertText: "Save as ",   documentation: "Bind step output to variable", range },
-        { label: "End If",   kind: K, insertText: "End If",     documentation: "Close If block", range },
-        { label: "End",      kind: K, insertText: "End",        documentation: "Close parallel/escalation block", range },
-      ];
-
-      return { suggestions: items };
-    },
-  });
-}
-
-// ── Component ─────────────────────────────────────────────────────────────
-export default function LabClient() {
-  const [code, setCode]                 = useState(BLANK_TEMPLATE);
-  const [inputs, setInputs]             = useState<Record<string, string>>({});
-  const [running, setRunning]           = useState(false);
-  const [result, setResult]             = useState<ExecutionResult | null>(null);
-  const [error, setError]               = useState<string | null>(null);
-  const [tab, setTab]                   = useState<TabId>("customer");
-  const [syntaxErrors, setSyntaxErrors] = useState<SyntaxError[]>([]);
-  const [activeError, setActiveError]   = useState<SyntaxError | null>(null);
-  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
-
-  // Parse input names from workflow declaration
-  const inputNames: string[] = (() => {
-    const m = code.match(/^Workflow\s+"[^"]+"\s+with\s+(.+)$/mi);
-    if (!m) return [];
-    return m[1].split(",").map((s) => s.trim()).filter(Boolean);
-  })();
-
-  const handleEditorMount = useCallback((ed: editor.IStandaloneCodeEditor, monaco: typeof import("monaco-editor")) => {
-    editorRef.current = ed;
-    setupMonaco(monaco);
-    monaco.editor.setTheme("olang-dark");
-    const model = ed.getModel();
-    if (model) {
-      setSyntaxErrors(validateOLang(model.getValue()));
-      model.onDidChangeContent(() => {
-        const e = validateOLang(model.getValue());
-        setSyntaxErrors(e);
-        if (e.length === 0) setActiveError(null);
-      });
-    }
-  }, []);
-
-  const run = async () => {
-    setRunning(true);
-    setError(null);
-    setResult(null);
-    setTab("customer");
-
-    try {
-      const payload = {
-        workflow: code,
-        inputs,
-        __kernel: { workflow_id: "lab", runtime_version: "1.2.15-alpha", gov_profile_hash: null },
-      };
-
-      const res  = await fetch(`${KERNEL_URL}/run`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-      const now  = new Date().toISOString();
-      const ms   = Math.floor(Math.random() * 180 + 80);
-      const ok   = res.ok && !data.error;
-
-      const safetyEvents: Array<{ type: "allow" | "block" | "warn"; message: string; detail: string; timestamp: string }> = [
-        { type: "allow", message: "Tool allowlist check passed",  detail: "allowed_resolvers validated", timestamp: now },
-        { type: "allow", message: "PII validation passed",        detail: "validator: pii_v2",           timestamp: now },
-        { type: ok ? "allow" : "block",
-          message: ok ? "Execution completed without policy violations" : "Policy violation detected",
-          detail: `fingerprint: ${fakeHash(code).slice(9, 36)}…`, timestamp: now },
-      ];
-
-      setResult({
-        ok,
-        response: data.response ?? data.result ?? data.output ?? undefined,
-        error:    data.error ?? undefined,
-        violation: data.violation,
-        steps: data.steps ?? [
-          { step: 1, resolver: "GroqLLM", status: "allowed",
-            input: JSON.stringify(inputs).slice(0, 60),
-            policy_check: "allowlist: pass | intent: pass", timestamp: now },
-        ],
-        audit: data.audit ?? {
-          execution_hash:   fakeHash(code + now),
-          prev_hash:        fakeHash(now),
-          kernel_signature: fakeHash(code).slice(0, 40),
-          workflow_hash:    fakeHash(code),
-          timestamp:        now,
-          latency_ms:       ms,
-        },
-        safety: { events: safetyEvents },
-        intent: {
-          scope:       "lab_sandbox",
-          prohibited:  [],
-          enforcement: ["allowlist", "pii_filter"],
-          fingerprint: fakeHash(code).slice(0, 32),
-        },
-      });
-    } catch (e) {
-      setError(`Network error: ${String(e)}`);
-    } finally {
-      setRunning(false);
-    }
+  const handleSubmit = () => {
+    if (!form.name || !form.description || !form.repo || !form.contact) return;
+    setSubmitted(true);
   };
 
-  const errorCount   = syntaxErrors.filter(e => e.severity === "error").length;
-  const warningCount = syntaxErrors.filter(e => e.severity === "warning").length;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[560px] overflow-hidden">
+        <div className="bg-grad-hero px-7 py-6 relative overflow-hidden">
+          <div className="absolute inset-0 bg-hero-grid opacity-[0.04] pointer-events-none" />
+          <div className="relative z-10 flex items-start justify-between gap-4">
+            <div>
+              <span className="font-mono text-[11px] tracking-[1.2px] uppercase text-blue-muted block mb-1.5">Tool Registry</span>
+              <h2 className="font-syne text-[22px] font-extrabold text-white leading-tight">Submit a tool</h2>
+              <p className="text-white/50 text-[13.5px] mt-1">Node.js or Python — all runtimes welcome</p>
+            </div>
+            <button onClick={onClose} className="text-white/40 hover:text-white/70 transition-colors mt-0.5 flex-shrink-0">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+                <path d="M4 4l12 12M16 4L4 16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {submitted ? (
+          <div className="px-7 py-10 text-center">
+            <div className="w-14 h-14 rounded-full bg-green/10 flex items-center justify-center mx-auto mb-4">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" className="w-7 h-7"><path d="M5 13l4 4L19 7" /></svg>
+            </div>
+            <h3 className="font-syne text-[20px] font-extrabold text-ink mb-2">Submission received</h3>
+            <p className="text-ink-4 text-[14px] leading-relaxed max-w-[340px] mx-auto">
+              We&apos;ll independently re-run the full conformance suite (R-005 → R-012) against <span className="font-mono text-ink">{form.name}</span>, then review governance compatibility before approving listing.
+              You&apos;ll hear back at <span className="font-mono text-ink">{form.contact}</span> within 3–5 business days.
+            </p>
+            <button onClick={onClose} className="mt-6 px-5 py-2.5 bg-blue text-white text-[14px] font-semibold rounded-[10px] hover:opacity-90 transition-opacity">Done</button>
+          </div>
+        ) : (
+          <div className="px-7 py-6 flex flex-col gap-4">
+            {/* Runtime */}
+            <div>
+              <label className="text-[12px] font-semibold text-ink-4 uppercase tracking-wider block mb-2">Runtime</label>
+              <div className="flex gap-2">
+                {[{ val: "node", label: "Node.js / npm" }, { val: "python", label: "Python / PyPI" }].map(({ val, label }) => (
+                  <button
+                    key={val}
+                    onClick={() => set("runtime", val)}
+                    className={`px-4 py-2 rounded-[9px] text-[13px] font-semibold border-[1.5px] transition-all ${
+                      form.runtime === val ? "bg-blue text-white border-blue" : "bg-surface-2 text-ink-4 border-border hover:border-blue hover:text-blue"
+                    }`}
+                  >{label}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Conformance note */}
+            <div className="rounded-[10px] bg-blue-light border border-blue/20 px-4 py-3 flex items-start gap-2.5">
+              <svg viewBox="0 0 16 16" fill="none" stroke="#1a56db" strokeWidth="1.6" className="w-3.5 h-3.5 mt-0.5 flex-shrink-0">
+                <circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/>
+              </svg>
+              <p className="text-[12.5px] text-blue/80 leading-snug">
+                Your resolver must pass the{" "}
+                <a href="https://github.com/O-Lang-Central/resolver-test" target="_blank" rel="noopener noreferrer" className="underline font-semibold">O-Lang conformance test suite</a>
+                {" "}and carry the certification badge before submitting.
+              </p>
+            </div>
+
+            {/* Conformance note */}
+            <div className="rounded-[10px] bg-blue-light border border-blue/20 px-4 py-3 flex items-start gap-2.5">
+              <svg viewBox="0 0 16 16" fill="none" stroke="#1a56db" strokeWidth="1.6" className="w-3.5 h-3.5 mt-0.5 flex-shrink-0">
+                <circle cx="8" cy="8" r="6"/><path d="M5 8l2 2 4-4"/>
+              </svg>
+              <p className="text-[12.5px] text-blue/80 leading-snug">
+                Your resolver must pass the{" "}
+                <a href="https://github.com/O-Lang-Central/resolver-test" target="_blank" rel="noopener noreferrer" className="underline font-semibold text-blue">O-Lang conformance test suite</a>
+                {" "}and carry the certification badge before submitting.
+              </p>
+            </div>
+
+            {/* Package name */}
+            <div>
+              <label className="text-[12px] font-semibold text-ink-4 uppercase tracking-wider block mb-1.5">
+                {form.runtime === "node" ? "npm package name" : "PyPI package name"}
+              </label>
+              <input
+                type="text"
+                placeholder={form.runtime === "node" ? "@your-org/tool-name" : "your-package-name"}
+                value={form.name}
+                onChange={(e) => set("name", e.target.value)}
+                className="w-full border-[1.5px] border-border rounded-[10px] px-4 py-2.5 text-[14px] font-mono text-ink placeholder:text-ink-5 outline-none focus:border-blue transition-colors bg-surface-2"
+              />
+            </div>
+
+            {/* Domain */}
+            <div>
+              <label className="text-[12px] font-semibold text-ink-4 uppercase tracking-wider block mb-1.5">Domain</label>
+              <select
+                value={form.scope}
+                onChange={(e) => set("scope", e.target.value)}
+                className="w-full border-[1.5px] border-border rounded-[10px] px-4 py-2.5 text-[14px] text-ink outline-none focus:border-blue transition-colors bg-surface-2"
+              >
+                <option value="finance">Finance</option>
+                <option value="health">Healthcare</option>
+                <option value="legal">Legal</option>
+                <option value="iot">IoT</option>
+                <option value="llm">LLM</option>
+                <option value="utils">Utils / General</option>
+              </select>
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="text-[12px] font-semibold text-ink-4 uppercase tracking-wider block mb-1.5">Short description</label>
+              <textarea
+                placeholder="What does this tool do? What governance policies does it enforce?"
+                value={form.description}
+                onChange={(e) => set("description", e.target.value)}
+                rows={3}
+                className="w-full border-[1.5px] border-border rounded-[10px] px-4 py-2.5 text-[14px] text-ink placeholder:text-ink-5 outline-none focus:border-blue transition-colors bg-surface-2 resize-none"
+              />
+            </div>
+
+            {/* Repo */}
+            <div>
+              <label className="text-[12px] font-semibold text-ink-4 uppercase tracking-wider block mb-1.5">Repository URL</label>
+              <input
+                type="url"
+                placeholder="https://github.com/your-org/your-tool"
+                value={form.repo}
+                onChange={(e) => set("repo", e.target.value)}
+                className="w-full border-[1.5px] border-border rounded-[10px] px-4 py-2.5 text-[14px] text-ink placeholder:text-ink-5 outline-none focus:border-blue transition-colors bg-surface-2"
+              />
+            </div>
+
+            {/* Contact */}
+            <div>
+              <label className="text-[12px] font-semibold text-ink-4 uppercase tracking-wider block mb-1.5">Contact email</label>
+              <input
+                type="email"
+                placeholder="you@example.com"
+                value={form.contact}
+                onChange={(e) => set("contact", e.target.value)}
+                className="w-full border-[1.5px] border-border rounded-[10px] px-4 py-2.5 text-[14px] text-ink placeholder:text-ink-5 outline-none focus:border-blue transition-colors bg-surface-2"
+              />
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
+              <p className="text-[12px] text-ink-5 leading-snug max-w-[280px]">
+                Run olang-test --json locally first. All 8 tests (R-005 → R-012) must pass and badge.txt must be generated before submitting.
+              </p>
+              <button
+                onClick={handleSubmit}
+                disabled={!form.name || !form.description || !form.repo || !form.contact}
+                className="px-5 py-2.5 bg-blue text-white text-[14px] font-semibold rounded-[10px] hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+              >
+                Submit tool →
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Main page ────────────────────────────────────────────────────────────────
+export function RegistryPage() {
+  const [query,  setQuery]  = useState("");
+  const [filter, setFilter] = useState<ResolverScope | "all">("all");
+  const [showSubmit, setShowSubmit] = useState(false);
+
+  const visible = RESOLVERS.filter((r) => {
+    const matchFilter = filter === "all" || r.scope === filter;
+    const q = query.toLowerCase();
+    const matchQuery =
+      !q ||
+      r.name.toLowerCase().includes(q) ||
+      r.description.toLowerCase().includes(q) ||
+      r.tags.some((t) => t.includes(q));
+    return matchFilter && matchQuery;
+  });
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden" style={{ background: BG, color: TEXT }}>
+    <div className="min-h-screen bg-surface-2 pt-16">
+      {showSubmit && <SubmitModal onClose={() => setShowSubmit(false)} />}
 
-      {/* ── Top bar ── */}
-      <div className="flex items-center justify-between px-5 py-3 flex-shrink-0"
-           style={{ background: PANEL, borderBottom: `1px solid ${BORDER}` }}>
-        <div className="flex items-center gap-4">
-          <Link href="/" className="font-syne font-extrabold text-[15px] tracking-[-0.5px]" style={{ color: TEXT }}>
-            O-Lang
-          </Link>
-          <span style={{ color: BORDER }}>›</span>
-          <span className="font-mono text-[13px] font-semibold" style={{ color: accent }}>Lab</span>
-          <span className="font-mono text-[10px] px-2 py-0.5 rounded-full border"
-                style={{ color: WARN, borderColor: WARN + "40", background: WARN + "10" }}>
-            sandbox
+      {/* ── Kernel in development banner ── */}
+      <div className="bg-amber-50 border-b border-amber-200 px-[5%] py-3">
+        <div className="max-w-[1160px] mx-auto flex items-center gap-3">
+          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-amber-400/30 flex items-center justify-center">
+            <svg viewBox="0 0 12 12" fill="#d97706" className="w-2.5 h-2.5"><circle cx="6" cy="6" r="5" /></svg>
           </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link href="/syntax"
-                className="font-mono text-[12px] px-3 py-1.5 rounded-lg transition-colors"
-                style={{ color: TEXT2, border: `1px solid ${BORDER}` }}>
-            Syntax ref ↗
-          </Link>
-          <Link href="/playground"
-                className="font-mono text-[12px] px-3 py-1.5 rounded-lg transition-colors"
-                style={{ color: TEXT2, border: `1px solid ${BORDER}` }}>
-            ← Playground
-          </Link>
-          <Link href="/docs"
-                className="font-mono text-[12px] px-3 py-1.5 rounded-lg transition-colors"
-                style={{ color: TEXT2, border: `1px solid ${BORDER}` }}>
-            Docs
-          </Link>
+          <p className="text-[13px] text-amber-800 leading-snug">
+            <span className="font-semibold">The O-Lang JS kernel is stable and ready to use.</span>
+            {" "}It is language-agnostic — any language can call it over HTTP. Python tools can already integrate today via the HTTP bridge.{" "}
+            A <span className="font-mono text-[12px] bg-amber-100 border border-amber-200 rounded px-1.5 py-0.5">native Python kernel</span> is under active development for seamless pip-native integration.{" "}
+            <a href="/docs#kernel" className="underline underline-offset-2 hover:text-amber-900 transition-colors font-medium">Learn more ↗</a>
+          </p>
         </div>
       </div>
 
-      {/* ── Main ── */}
-      <div className="flex flex-1 overflow-hidden">
-
-        {/* LEFT: Inputs + hints */}
-        <div className="w-64 flex-shrink-0 flex flex-col overflow-y-auto"
-             style={{ background: PANEL, borderRight: `1px solid ${BORDER}` }}>
-
-          {/* Run button */}
-          <div className="p-4" style={{ borderBottom: `1px solid ${BORDER}` }}>
-            <button
-              onClick={run}
-              disabled={running || errorCount > 0}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm transition-all disabled:opacity-50"
-              style={{ background: running ? accent + "40" : errorCount > 0 ? ERR + "30" : accent, color: "#fff" }}
-            >
-              {running ? (
-                <><svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeDasharray="31 31"/></svg>Running…</>
-              ) : errorCount > 0 ? (
-                <>✗ Fix {errorCount} error{errorCount > 1 ? "s" : ""} first</>
-              ) : (
-                <><svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4"><path d="M5 3l11 7-11 7V3z"/></svg>Run Workflow</>
-              )}
-            </button>
-            {/* Error/warning pill row */}
-            {(errorCount > 0 || warningCount > 0) && (
-              <div className="flex gap-2 mt-2">
-                {errorCount > 0 && (
-                  <span className="font-mono text-[11px] px-2 py-0.5 rounded-full"
-                        style={{ background: ERR + "20", color: ERR, border: `1px solid ${ERR}40` }}>
-                    {errorCount} error{errorCount > 1 ? "s" : ""}
-                  </span>
-                )}
-                {warningCount > 0 && (
-                  <span className="font-mono text-[11px] px-2 py-0.5 rounded-full"
-                        style={{ background: WARN + "20", color: WARN, border: `1px solid ${WARN}40` }}>
-                    {warningCount} warning{warningCount > 1 ? "s" : ""}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Dynamic inputs */}
-          <div className="p-4" style={{ borderBottom: `1px solid ${BORDER}` }}>
-            <p className="text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: TEXT2 }}>
-              Workflow Inputs
+      {/* Header */}
+      <div className="bg-grad-hero px-[5%] py-16 relative overflow-hidden">
+        <div className="absolute inset-0 bg-hero-grid opacity-[0.04] pointer-events-none" />
+        <div className="max-w-[1160px] mx-auto relative z-10 flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <span className="font-mono text-[11px] tracking-[1.2px] uppercase text-blue-muted block mb-3">Tool Registry</span>
+            <h1 className="font-syne text-[42px] font-extrabold tracking-[-1.5px] text-white leading-tight mb-3">
+              Governed tools,<br />ready to use
+            </h1>
+            <p className="text-white/55 text-[17px] max-w-[520px] leading-relaxed">
+              Every tool is schema-validated, version-pinned, and signed before listing. Available for{" "}
+              <code className="font-mono text-blue-muted bg-white/[0.08] px-1.5 py-0.5 rounded text-[14px]">npm</code>
+              {" "}and{" "}
+              <code className="font-mono text-blue-muted bg-white/[0.08] px-1.5 py-0.5 rounded text-[14px]">pip</code>.
             </p>
-            {inputNames.length === 0 ? (
-              <p className="text-[13px] italic" style={{ color: TEXT2 }}>
-                Declare inputs with the <span style={{ color: accent }}>with</span> clause
-              </p>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {inputNames.map((name) => (
-                  <div key={name}>
-                    <label className="font-mono text-[13px] font-semibold mb-1.5 block" style={{ color: TEXT }}>{name}</label>
-                    <input
-                      type="text"
-                      value={inputs[name] ?? ""}
-                      onChange={(e) => setInputs((p) => ({ ...p, [name]: e.target.value }))}
-                      placeholder={`value for ${name}`}
-                      className="w-full rounded-lg px-3 py-2 text-[13px] font-mono outline-none"
-                      style={{ background: BG, border: `1px solid ${BORDER}`, color: TEXT, caretColor: accent }}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Syntax hints */}
-          {syntaxErrors.length > 0 && (
-            <div className="p-4" style={{ borderBottom: `1px solid ${BORDER}` }}>
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: TEXT3 }}>
-                Syntax Hints
-              </p>
-              <div className="flex flex-col gap-2">
-                {syntaxErrors.map((e, i) => (
-                  <button key={i}
-                    onClick={() => {
-                      setActiveError(e);
-                      editorRef.current?.revealLineInCenter(e.line);
-                      editorRef.current?.setPosition({ lineNumber: e.line, column: e.col });
-                      editorRef.current?.focus();
-                    }}
-                    className="text-left rounded-lg p-2.5 text-[12px] transition-all"
-                    style={{
-                      background: e.severity === "error" ? "#ef444415" : "#f59e0b10",
-                      border: `1px solid ${e.severity === "error" ? "#ef444435" : "#f59e0b30"}`,
-                    }}>
-                    <p className="font-mono text-[11px] font-bold mb-0.5"
-                       style={{ color: e.severity === "error" ? ERR : WARN }}>
-                      {e.severity === "error" ? "✗" : "⚠"} Line {e.line}
-                    </p>
-                    <p style={{ color: TEXT }}>{e.message}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Fix suggestion */}
-          {activeError && (
-            <div className="p-4" style={{ borderBottom: `1px solid ${BORDER}` }}>
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: accent }}>
-                💡 Suggestion
-              </p>
-              <div className="rounded-lg p-2.5 font-mono text-[12px] leading-relaxed whitespace-pre-wrap"
-                   style={{ background: "#60a5fa10", border: "1px solid #60a5fa30", color: "#93c5fd" }}>
-                {activeError.suggestion}
-              </div>
-            </div>
-          )}
-
-          {/* Live resolvers */}
-          <div className="p-4" style={{ borderBottom: `1px solid ${BORDER}` }}>
-            <p className="text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: TEXT2 }}>
-              Live on this server
-            </p>
-            <div className="flex flex-col gap-2 mb-3">
-              {["GroqLLM", "BankAccountLookup", "ICUAdmission"].map((r) => (
-                <div key={r} className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: OK }} />
-                  <span className="font-mono text-[13px] font-semibold" style={{ color: OK }}>{r}</span>
-                </div>
-              ))}
-            </div>
-            <p className="text-[13px] leading-relaxed" style={{ color: TEXT }}>
-              Any other resolver you declare will be{" "}
-              <span className="font-semibold" style={{ color: WARN }}>simulated</span>{" "}
-              — you&apos;ll still see the full governed execution flow.
+            <p className="text-white/30 text-[13px] mt-2 font-mono">
+              In O-Lang, tools are called <span className="text-blue-muted/60">resolvers</span> —{" "}
+              <a href="/docs" className="underline underline-offset-2 hover:text-white/50 transition-colors">learn why in the docs ↗</a>
             </p>
           </div>
-
-          {/* Tips */}
-          {syntaxErrors.length === 0 && (
-            <div className="p-4">
-              <p className="text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: TEXT2 }}>Tips</p>
-              <div className="flex flex-col gap-2.5 text-[13px]" style={{ color: TEXT }}>
-                <p>Hit <span className="font-mono font-semibold" style={{ color: accent }}>Ctrl+Space</span> for snippet autocomplete.</p>
-                <p>Use <span className="font-mono" style={{ color: accent }}>If {"{var}"} greater than N then</span> for conditionals.</p>
-                <p>Close If blocks with <span className="font-mono" style={{ color: accent }}>End If</span>. Close parallel with <span className="font-mono" style={{ color: accent }}>End</span>.</p>
-                <p>
-                  Full language reference:{" "}
-                  <Link href="/syntax" className="font-semibold underline underline-offset-2" style={{ color: accent }}>/syntax</Link>
-                </p>
-              </div>
-            </div>
-          )}
+          <button
+            onClick={() => setShowSubmit(true)}
+            className="flex items-center gap-2.5 px-5 py-3 bg-white/10 hover:bg-white/15 border border-white/20 hover:border-white/30 text-white text-[14px] font-semibold rounded-[12px] transition-all flex-shrink-0"
+          >
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-4 h-4">
+              <circle cx="10" cy="10" r="8" /><path d="M10 6v8M6 10h8" />
+            </svg>
+            Submit a tool
+          </button>
         </div>
+      </div>
 
-        {/* CENTRE: Monaco */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-2.5 flex-shrink-0"
-               style={{ background: "#060c18", borderBottom: `1px solid ${BORDER}` }}>
-            <div className="flex items-center gap-3">
-              <div className="flex gap-1.5">
-                {["#ff5f57", "#ffbd2e", "#28c840"].map((c) => (
-                  <span key={c} className="w-3 h-3 rounded-full" style={{ background: c }} />
-                ))}
-              </div>
-              <span className="font-mono text-sm font-medium" style={{ color: TEXT3 }}>sandbox.ol</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => { setCode(BLANK_TEMPLATE); setInputs({}); setResult(null); setError(null); setActiveError(null); }}
-                className="font-mono text-sm px-3 py-1 rounded-lg transition-all hover:text-white"
-                style={{ color: TEXT3, border: `1px solid ${BORDER}` }}>
-                Reset
-              </button>
-              <span className="font-mono text-xs" style={{ color: TEXT3 }}>Ctrl+Space for snippets</span>
-            </div>
-          </div>
-
-          <div className="flex-1">
-            <MonacoEditor
-              height="100%"
-              language="olang"
-              value={code}
-              onChange={(v) => setCode(v ?? "")}
-              onMount={handleEditorMount}
-              options={{
-                fontSize: 14,
-                fontFamily: "'DM Mono', 'Fira Code', monospace",
-                lineHeight: 24,
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-                padding: { top: 24, bottom: 24 },
-                renderLineHighlight: "line",
-                lineNumbers: "on",
-                glyphMargin: true,
-                folding: false,
-                overviewRulerLanes: 0,
-                wordWrap: "on",
-                automaticLayout: true,
-                quickSuggestions: true,
-                suggestOnTriggerCharacters: true,
-                tabSize: 2,
-              }}
+      {/* Search + filter bar */}
+      <div className="sticky top-16 z-40 bg-white border-b border-border px-[5%] py-4 shadow-sm">
+        <div className="max-w-[1160px] mx-auto flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2.5 bg-surface-2 border-[1.5px] border-border-2 rounded-[10px] px-4 py-2.5 w-[340px] max-w-full">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="w-4 h-4 text-ink-5 flex-shrink-0">
+              <circle cx="9" cy="9" r="6" /><path d="M15 15l4 4" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search tools, tags, authors…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="border-none outline-none bg-transparent text-[14px] text-ink placeholder:text-ink-5 flex-1 font-sans"
             />
           </div>
-        </div>
-
-        {/* RIGHT: Results */}
-        <div className="w-96 flex-shrink-0 flex flex-col overflow-hidden"
-             style={{ background: PANEL, borderLeft: `1px solid ${BORDER}` }}>
-
-          <div className="flex flex-shrink-0" style={{ borderBottom: `1px solid ${BORDER}` }}>
-            {TABS.map((t) => (
-              <button key={t.id} onClick={() => setTab(t.id)}
-                className="flex-1 py-3.5 text-xs font-bold uppercase tracking-wider transition-colors relative"
-                style={{ color: tab === t.id ? TEXT : TEXT3 }}>
-                {t.label}
-                {tab === t.id && (
-                  <span className="absolute bottom-0 left-2 right-2 h-0.5 rounded-t-full" style={{ background: accent }} />
-                )}
-              </button>
+          <div className="flex gap-2 flex-wrap">
+            {FILTERS.map((f) => (
+              <button
+                key={f.value}
+                onClick={() => setFilter(f.value)}
+                className={`px-3.5 py-1.5 rounded-full text-[13px] font-semibold border-[1.5px] transition-all ${
+                  filter === f.value ? "bg-blue text-white border-blue" : "bg-white text-ink-4 border-border hover:border-blue hover:text-blue"
+                }`}
+              >{f.label}</button>
             ))}
           </div>
+          <span className="ml-auto text-[13px] text-ink-5 hidden md:block">
+            {visible.length} resolver{visible.length !== 1 ? "s" : ""}
+          </span>
+        </div>
+      </div>
 
-          <div className="flex-1 overflow-y-auto p-5">
-
-            {/* Empty state */}
-            {!result && !error && (
-              <div className="flex flex-col items-center justify-center h-full text-center gap-4 py-16">
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
-                     style={{ background: accent + "15", border: `1px solid ${accent}25` }}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth="1.5" className="w-8 h-8">
-                    <path d="M5 3l14 9-14 9V3z"/>
-                  </svg>
+      {/* Grid */}
+      <div className="px-[5%] py-10">
+        <div className="max-w-[1160px] mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {visible.map((r: Resolver) => (
+            <div
+              key={r.name}
+              className="bg-white border-[1.5px] border-border rounded-2xl p-6 shadow-sm hover:-translate-y-0.5 hover:shadow-md hover:border-border-2 transition-all cursor-pointer"
+            >
+              <div className="flex items-start gap-3 mb-4">
+                <div
+                  className="w-10 h-10 rounded-[10px] flex items-center justify-center text-white font-syne text-[13px] font-extrabold flex-shrink-0"
+                  style={{ background: `linear-gradient(135deg,${r.bgColor},${r.color})` }}
+                >
+                  {r.initials}
                 </div>
-                <div>
-                  <p className="text-base font-semibold mb-1" style={{ color: TEXT }}>Write & Run a Workflow</p>
-                  <p className="text-sm" style={{ color: TEXT2 }}>Results appear here after execution</p>
+                <div className="flex-1 min-w-0">
+                  <p className="font-mono text-[13px] font-medium text-ink truncate">{r.name}</p>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <span className="text-[11px] text-ink-5">{r.scope}</span>
+                    {r.pypi && (
+                      <span className="text-[10.5px] font-semibold text-blue bg-blue/8 border border-blue/20 px-1.5 py-0.5 rounded font-mono">
+                        PyPI
+                      </span>
+                    )}
+                    {r.verified && r.status !== "planned" && (
+                      <span className="flex items-center gap-1 text-[11px] text-green font-semibold">
+                        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3"><path d="M2 6l3 3 5-5" /></svg>
+                        verified
+                      </span>
+                    )}
+                    {r.status === "planned" && (
+                      <span className="flex items-center gap-1 text-[11px] font-semibold" style={{ color: "#f59e0b" }}>
+                        <svg viewBox="0 0 12 12" fill="currentColor" className="w-2.5 h-2.5">
+                          <circle cx="6" cy="6" r="5" fillOpacity="0.3" /><circle cx="6" cy="6" r="2" />
+                        </svg>
+                        planned
+                      </span>
+                    )}
+                  </div>
                 </div>
+                <span className="font-mono text-[11px] text-ink-5 flex-shrink-0">v{r.version}</span>
               </div>
-            )}
 
-            {error && (
-              <div className="rounded-xl p-4 text-sm mb-4 leading-relaxed"
-                   style={{ background: "#ef444415", border: "1px solid #ef444435", color: ERR }}>
-                {error}
-              </div>
-            )}
+              <p className="text-[13.5px] text-ink-4 leading-relaxed mb-4">{r.description}</p>
 
-            {/* Output */}
-            {tab === "customer" && result && (
-              <div className="space-y-4">
-                {result.ok && result.response && (
-                  <>
-                    <div className="rounded-2xl p-4" style={{ background: "#0f172a", border: `1px solid ${BORDER}` }}>
-                      <p className="text-[13px] leading-relaxed" style={{ color: TEXT }}>{result.response}</p>
-                    </div>
-                    <div className="flex items-center gap-2 px-1">
-                      <svg viewBox="0 0 16 16" fill="none" stroke={OK} strokeWidth="1.5" className="w-4 h-4 flex-shrink-0">
-                        <path d="M8 14s6-3 6-7.5V3.75L8 2 2 3.75V6.5C2 11 8 14 8 14z"/>
-                        <path d="M5.5 8l2 2 3-3"/>
-                      </svg>
-                      <p className="text-[12px] font-semibold" style={{ color: OK }}>Response verified by O-Lang kernel</p>
-                    </div>
-                  </>
-                )}
-                {!result.ok && (
-                  <div className="rounded-2xl p-4" style={{ background: "#ef444415", border: "1px solid #ef444430" }}>
-                    <p className="text-sm font-semibold mb-1" style={{ color: ERR }}>Execution failed</p>
-                    <p className="text-sm" style={{ color: TEXT2 }}>{result.error ?? "An error occurred during execution."}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Trace */}
-            {tab === "trace" && result && (
-              <div className="space-y-3">
-                {result.steps.map((s, i) => {
-                  const isSimulated = (s as { mode?: string }).mode === "simulated";
-                  return (
-                    <div key={i} className="rounded-xl p-4"
-                         style={{ background: "#0f172a", border: `1px solid ${isSimulated ? WARN + "40" : BORDER}` }}>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-mono text-[11px] font-bold" style={{ color: accent }}>Step {s.step}</span>
-                        <div className="flex items-center gap-1.5">
-                          {isSimulated && (
-                            <span className="font-mono text-[10px] px-2 py-0.5 rounded-full"
-                                  style={{ background: WARN + "20", color: WARN, border: `1px solid ${WARN}40` }}>
-                              simulated
-                            </span>
-                          )}
-                          <span className="font-mono text-[10px] px-2 py-0.5 rounded-full"
-                                style={{ background: s.status === "allowed" ? OK + "20" : ERR + "20",
-                                         color: s.status === "allowed" ? OK : ERR }}>
-                            {s.status}
-                          </span>
-                        </div>
-                      </div>
-                      <p className="font-mono text-[12px] mb-1" style={{ color: isSimulated ? WARN : OK }}>{s.resolver}</p>
-                      {isSimulated && (
-                        <p className="text-[11px] mb-1 italic" style={{ color: WARN + "aa" }}>
-                          ⚡ Not installed on this server — response is simulated
-                        </p>
-                      )}
-                      <p className="text-[12px]" style={{ color: TEXT2 }}>Input: {s.input}</p>
-                      <p className="text-[11px] mt-1" style={{ color: TEXT3 }}>Policy: {s.policy_check}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Safety */}
-            {tab === "safety" && result && (
-              <div className="space-y-3">
-                {result.safety.events.map((e, i) => (
-                  <div key={i} className="flex items-start gap-3 rounded-xl p-3.5"
-                       style={{
-                         background: e.type === "block" ? "#ef444415" : e.type === "allow" ? OK + "12" : "#f59e0b12",
-                         border: `1px solid ${e.type === "block" ? "#ef444435" : e.type === "allow" ? OK + "35" : "#f59e0b35"}`,
-                       }}>
-                    <span className="text-sm mt-0.5">{e.type === "allow" ? "✓" : e.type === "block" ? "✗" : "⚠"}</span>
-                    <div>
-                      <p className="text-[13px] font-semibold"
-                         style={{ color: e.type === "block" ? ERR : e.type === "allow" ? OK : WARN }}>
-                        {e.message}
-                      </p>
-                      <p className="font-mono text-[11px] mt-0.5" style={{ color: TEXT2 }}>{e.detail}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Audit */}
-            {tab === "audit" && result && (
-              <div className="space-y-3">
-                {[
-                  { label: "Execution Hash", value: result.audit.execution_hash },
-                  { label: "Prev Hash",      value: result.audit.prev_hash },
-                  { label: "Kernel Sig",     value: result.audit.kernel_signature },
-                  { label: "Workflow Hash",  value: result.audit.workflow_hash },
-                  { label: "Timestamp",      value: result.audit.timestamp },
-                  { label: "Latency",        value: `${result.audit.latency_ms}ms` },
-                ].map(({ label, value }) => (
-                  <div key={label} className="rounded-xl p-3.5"
-                       style={{ background: "#0f172a", border: `1px solid ${BORDER}` }}>
-                    <p className="font-mono text-[10px] uppercase tracking-widest mb-1" style={{ color: TEXT3 }}>{label}</p>
-                    <p className="font-mono text-[12px] break-all" style={{ color: accent }}>{value}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Intent */}
-            {tab === "intent" && result && (
-              <div className="space-y-3">
-                <div className="rounded-xl p-4" style={{ background: "#0f172a", border: `1px solid ${BORDER}` }}>
-                  <p className="font-mono text-[10px] uppercase tracking-widest mb-1" style={{ color: TEXT3 }}>Scope</p>
-                  <p className="font-mono text-[13px]" style={{ color: "#c4b5fd" }}>{result.intent.scope}</p>
-                </div>
-                <div className="rounded-xl p-4" style={{ background: "#0f172a", border: `1px solid ${BORDER}` }}>
-                  <p className="font-mono text-[10px] uppercase tracking-widest mb-2" style={{ color: TEXT3 }}>Enforcement</p>
-                  {result.intent.enforcement.map((e) => (
-                    <span key={e} className="inline-block font-mono text-[11px] px-2 py-0.5 rounded mr-1.5 mb-1.5"
-                          style={{ background: OK + "15", border: `1px solid ${OK}30`, color: OK }}>{e}</span>
+              <div className="flex items-center justify-between">
+                <div className="flex gap-1.5 flex-wrap">
+                  {r.tags.map((t) => (
+                    <span key={t} className="font-mono text-[10.5px] px-2 py-0.5 rounded bg-surface-3 text-ink-5 border border-border">{t}</span>
                   ))}
                 </div>
-                <div className="rounded-xl p-4" style={{ background: "#0f172a", border: `1px solid ${BORDER}` }}>
-                  <p className="font-mono text-[10px] uppercase tracking-widest mb-1" style={{ color: TEXT3 }}>Fingerprint</p>
-                  <p className="font-mono text-[12px] break-all" style={{ color: accent }}>{result.intent.fingerprint}</p>
-                </div>
+                {r.downloads != null && r.downloads > 0 && (
+                  <span className="text-[12px] text-ink-5 flex items-center gap-1 ml-2">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-3.5 h-3.5"><path d="M8 2v8M5 7l3 3 3-3M3 12h10" /></svg>
+                    {r.downloads.toLocaleString()}
+                  </span>
+                )}
               </div>
-            )}
 
+              {/* Install snippet */}
+              <div className="mt-4 bg-surface-3 border border-border rounded-lg px-3 py-2 font-mono text-[11.5px] text-ink-4 flex items-center justify-between gap-2">
+                <span className="truncate">{r.pypi ? `pip install ${r.name}` : `npm install ${r.name}`}</span>
+                <button
+                  onClick={() => navigator.clipboard?.writeText(r.pypi ? `pip install ${r.name}` : `npm install ${r.name}`)}
+                  className="text-ink-5 hover:text-ink transition-colors flex-shrink-0"
+                  title="Copy"
+                >
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-3.5 h-3.5">
+                    <rect x="4" y="4" width="8" height="8" rx="2" /><path d="M8 2H6a2 2 0 00-2 2v2" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {visible.length === 0 && (
+            <div className="col-span-3 text-center py-20 text-ink-5">
+              <p className="text-[16px] font-semibold mb-2">No tools found</p>
+              <p className="text-[14px]">Try a different search term or filter</p>
+            </div>
+          )}
+        </div>
+
+        {/* Bottom CTA */}
+        <div className="max-w-[1160px] mx-auto mt-14 rounded-2xl border-[1.5px] border-border bg-white overflow-hidden">
+          {/* Header */}
+          <div className="px-8 pt-8 pb-5 border-b border-border">
+            <h3 className="font-syne text-[20px] font-extrabold text-ink mb-1.5">Built a governed tool?</h3>
+            <p className="text-ink-4 text-[14.5px] leading-relaxed max-w-[560px]">
+              Node.js, Python, or any JSON-capable runtime is welcome. Your resolver must pass the conformance suite (R-005 → R-012) and generate a certification badge locally first.
+              The O-Lang team then independently re-runs the full suite before approving your listing.
+            </p>
+          </div>
+
+          {/* 3-step publish flow */}
+          <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border">
+            {([
+              {
+                num: "1", color: "#1a56db",
+                title: "Run the conformance tests",
+                body: "Install the test runner and run all 8 conformance tests (R-005 → R-012) against your resolver. Tests enforce metadata, runtime shape, failure contract, input validation, retry semantics, output contract, determinism, and side-effect safety.",
+                code: "pip install olang-resolver-test && olang-test --json",
+                link: "https://github.com/O-Lang-Central/resolver-test",
+                linkLabel: "Test suite on GitHub ↗",
+              },
+              {
+                num: "2", color: "#059669",
+                title: "Earn your certification badge",
+                body: "A certification badge (badge.txt) is generated automatically when all 8 tests pass. Include it in your repo README to confirm O-Lang CERTIFIED status before submitting.",
+                code: "🎉 Resolver is O-Lang CERTIFIED\n🏷️  Badge generated: badge.txt",
+                link: "https://medium.com/@o-lang/olang-resolver-certification-essay",
+                linkLabel: "Read the conformance essay ↗",
+              },
+              {
+                num: "3", color: "#7c3aed",
+                title: "Submit for O-Lang review",
+                body: "Submit your certified resolver. The O-Lang team independently re-runs the full conformance suite (R-005 → R-012) and reviews governance compatibility. Once approved, your tool receives a verified badge and appears in the registry.",
+                code: null, link: null, linkLabel: null, cta: true,
+              },
+            ] as const).map(({ num, color, title, body, code, link, linkLabel, ...rest }) => (
+              <div key={num} className="px-6 py-6">
+                <div className="flex items-center gap-2.5 mb-3">
+                  <span
+                    className="w-7 h-7 rounded-full flex items-center justify-center font-syne font-extrabold text-[13px] text-white flex-shrink-0"
+                    style={{ background: color }}
+                  >{num}</span>
+                  <p className="font-syne font-bold text-[14.5px] text-ink">{title}</p>
+                </div>
+                <p className="text-[13.5px] text-ink-4 leading-relaxed mb-3">{body}</p>
+                {code && (
+                  <div className="rounded-[8px] bg-[#0f172a] px-3 py-2 font-mono text-[11.5px] text-[#93c5fd] mb-3 overflow-x-auto whitespace-pre">
+                    {code}
+                  </div>
+                )}
+                {link && (
+                  <a href={link} target="_blank" rel="noopener noreferrer"
+                    className="text-[12.5px] font-semibold underline underline-offset-2 transition-colors"
+                    style={{ color }}
+                  >{linkLabel}</a>
+                )}
+                {"cta" in rest && rest.cta && (
+                  <button
+                    onClick={() => setShowSubmit(true)}
+                    className="flex items-center gap-2 px-4 py-2.5 text-white text-[13.5px] font-semibold rounded-[10px] hover:opacity-90 transition-opacity"
+                    style={{ background: color }}
+                  >
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-4 h-4">
+                      <circle cx="10" cy="10" r="8" /><path d="M10 6v8M6 10h8" />
+                    </svg>
+                    Submit your tool
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       </div>
