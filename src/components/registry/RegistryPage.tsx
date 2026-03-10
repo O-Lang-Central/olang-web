@@ -449,3 +449,5 @@ export function RegistryPage() {
     </div>
   );
 }
+
+export default RegistryPage;
