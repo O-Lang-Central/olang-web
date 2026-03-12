@@ -36,9 +36,9 @@ const TABS: { id: TabId; label: string }[] = [
 const BLANK_TEMPLATE = `Workflow "My Workflow" with input1
 
 Allow resolvers:
-  GroqLLM
+- @o-lang/llm-groq
 
-Step 1: Ask GroqLLM "{input1}"
+Step 1: Ask @o-lang/llm-groq "{input1}"
 Save as response
 
 Return response`;
@@ -231,7 +231,7 @@ function validateOLang(code: string): SyntaxError[] {
       if (!/^Evolve\s+\S+\s+using feedback:\s*"[^"]*"$/i.test(t))
         errors.push({ line: lineNum, col: 1, endCol: t.length, severity: "error",
           message: 'Evolve syntax: Evolve ResolverName using feedback: "message"',
-          suggestion: 'Evolve GroqLLM using feedback: "Improve accuracy on edge cases"' });
+          suggestion: 'Evolve @o-lang/llm-groq using feedback: "Improve accuracy on edge cases"' });
       return;
     }
 
@@ -287,7 +287,7 @@ function validateOLang(code: string): SyntaxError[] {
   if (!hasAllow && hasWorkflow)
     errors.push({ line: 2, col: 1, endCol: 1, severity: "error",
       message: "Missing Allow resolvers: block.",
-      suggestion: "Allow resolvers:\n  GroqLLM" });
+      suggestion: "Allow resolvers:\n- @o-lang/llm-groq" });
   if (hasWorkflow && !hasReturn)
     errors.push({ line: lines.length, col: 1, endCol: 1, severity: "warning",
       message: "Workflow has no Return statement.",
@@ -375,7 +375,7 @@ function setupMonaco(monaco: typeof import("monaco-editor")) {
         {
           label: "Workflow",
           kind: S,
-          insertText: 'Workflow "${1:My Workflow}" with ${2:input1}\n\nAllow resolvers:\n  ${3:GroqLLM}\n\nStep 1: Ask ${3:GroqLLM} "{${2:input1}}"\nSave as ${4:response}\n\nReturn ${4:response}',
+          insertText: 'Workflow "${1:My Workflow}" with ${2:input1}\n\nAllow resolvers:\n- ${3:@o-lang/llm-groq}\n\nStep 1: Ask ${3:@o-lang/llm-groq} "{${2:input1}}"\nSave as ${4:response}\n\nReturn ${4:response}',
           insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
           documentation: "Full workflow scaffold",
           range,
@@ -383,7 +383,7 @@ function setupMonaco(monaco: typeof import("monaco-editor")) {
         {
           label: "Allow resolvers",
           kind: S,
-          insertText: "Allow resolvers:\n  ${1:GroqLLM}",
+          insertText: "Allow resolvers:\n- ${1:@o-lang/llm-groq}",
           insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
           documentation: "Resolver allowlist block",
           range,
@@ -591,7 +591,8 @@ export default function LabClient() {
         error:    data.error ?? undefined,
         violation: data.violation,
         steps: data.steps ?? [
-          { step: 1, resolver: "GroqLLM", status: "allowed",
+          { step: 1, resolver: (code.match(/-\s*(@o-lang\/[\w-]+|\S+resolver\S*)/i) ?? ["","@o-lang/llm-groq"])[1],
+            status: "allowed",
             input: JSON.stringify(inputs).slice(0, 60),
             policy_check: "allowlist: pass | intent: pass", timestamp: now },
         ],
@@ -777,7 +778,7 @@ export default function LabClient() {
               Live on this server
             </p>
             <div className="flex flex-col gap-2 mb-3">
-              {["GroqLLM", "BankAccountLookup", "ICUAdmission"].map((r) => (
+              {["@o-lang/llm-groq", "@o-lang/bank-account-lookup", "@o-lang/icu-admission"].map((r) => (
                 <div key={r} className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: OK }} />
                   <span className="font-mono text-[13px] font-semibold" style={{ color: OK }}>{r}</span>

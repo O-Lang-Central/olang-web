@@ -37,7 +37,7 @@ const HOW_STEPS = [
     n: "1", color: "#1a56db", bg: "#eff6ff",
     icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1a56db" strokeWidth="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
     title: "Wrap your existing tools",
-    text: "Point O-Lang at the tools your LangChain, CrewAI, or custom agents already use. A .ol file declares the allowlist, intent, and prohibitions — your tools don't change.",
+    text: "Write a .ol file. Declare your inputs, the resolvers it may call, and the intent scope. The kernel reads this as the authoritative contract — nothing outside it runs.",
   },
   {
     n: "2", color: "#059669", bg: "#f0fdf4",
@@ -59,8 +59,8 @@ export function HowItWorksSection() {
       <div className="max-w-[1160px] mx-auto">
         <SectionHeader
           eyebrow="How it works"
-          title={<>A governance layer for<br />the stack you already have</>}
-          subtitle="O-Lang doesn't replace LangChain, CrewAI, or AutoGen. It wraps your existing tool calls with enforcement: allowlists, intent verification, and cryptographic audit — over HTTP, in any language."
+          title={<>Write it once.<br />The kernel enforces it forever.</>}
+          subtitle="Declare your workflow in O-Lang. The kernel enforces every resolver call, intent boundary, and safety constraint at runtime — deterministically, with a cryptographic receipt. No framework needed."
         />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-14 reveal">
           {HOW_STEPS.map((s) => (
@@ -83,7 +83,7 @@ const FEATURES = [
   { color: "#059669", bg: "#f0fdf4", border: "#bbf7d0", tag: "__verified_intent", title: "Verified Intent", text: "Declare scope and prohibited actions. The kernel enforces both before and after execution — zero tolerance for scope creep.", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg> },
   { color: "#7c3aed", bg: "#faf5ff", border: "#e9d5ff", tag: "sha3-256 · ed25519", title: "Cryptographic Audit", text: "Every execution produces a SHA3-256 fingerprint, chained to the previous, and signed with ED25519. Full deterministic proof.", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.8"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 7h6M9 11h6M9 15h4"/></svg> },
   { color: "#d97706", bg: "#fffbeb", border: "#fde68a", tag: "$step.symbol.field", title: "Symbol Resolution", text: "Steps compose with typed symbols. Each tool declares its output schema — downstream steps receive validated, typed data, never raw LLM output.", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg> },
-  { color: "#dc2626", bg: "#fef2f2", border: "#fecaca", tag: "safety_policy", title: "Safety Policy Engine", text: "Built-in safety filters block hallucinations, PII leakage, speculative outputs, and prompt injection — configurable per domain.", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> },
+  { color: "#dc2626", bg: "#fef2f2", border: "#fecaca", tag: "kernel-native · 20+ languages", title: "PII Detection & Safety", text: "The kernel detects and redacts PII automatically on every execution — no extra resolver needed. Covers 20+ languages including Yoruba, Igbo, Hausa, Swahili, and Zulu. Hallucinations and prompt injection blocked at the same layer.", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> },
   { color: "#0891b2", bg: "#ecfeff", border: "#a5f3fc", tag: "@o-lang/tool-name", title: "Tool Registry", text: "Publish, version, and discover tools at olang.cloud/registry. Every tool is signed and schema-validated before listing.", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg> },
 ];
 
@@ -110,14 +110,134 @@ export function FeaturesSection() {
   );
 }
 
+// ── AFRICAN LANGUAGE PII ───────────────────────────────────────────────────
+const AFRICAN_LANGS = [
+  { code: "yo", name: "Yoruba",  region: "West Africa",    flag: "🇳🇬" },
+  { code: "ig", name: "Igbo",    region: "West Africa",    flag: "🇳🇬" },
+  { code: "ha", name: "Hausa",   region: "West Africa",    flag: "🇳🇬" },
+  { code: "sw", name: "Swahili", region: "East Africa",    flag: "🇰🇪" },
+  { code: "zu", name: "Zulu",    region: "Southern Africa",flag: "🇿🇦" },
+  { code: "xh", name: "Xhosa",   region: "Southern Africa",flag: "🇿🇦" },
+  { code: "am", name: "Amharic", region: "East Africa",    flag: "🇪🇹" },
+  { code: "so", name: "Somali",  region: "East Africa",    flag: "🇸🇴" },
+];
+
+const GLOBAL_LANGS = ["English","French","Arabic","Portuguese","Spanish","Hindi","German","Dutch","Italian","Mandarin","Japanese","Korean"];
+
+export function AfricanLanguageSection() {
+  return (
+    <section className="py-24 px-[5%]" id="languages">
+      <div className="max-w-[1160px] mx-auto">
+        <SectionHeader
+          eyebrow="Kernel-native · PII · 20+ languages"
+          title={<>Governance that speaks<br />your language</>}
+          subtitle="O-Lang's kernel detects and redacts PII automatically on every execution — in 20+ languages, with first-class support for African languages that every major AI framework ignores. No extra configuration. No optional plugin."
+        />
+
+        <div className="mt-14 grid grid-cols-1 lg:grid-cols-2 gap-8 reveal">
+          {/* African languages — hero card */}
+          <div className="rounded-[18px] border border-[#1a4a2e] bg-[#071a0f] p-7 flex flex-col gap-6">
+            <div className="flex items-center gap-3">
+              <span className="text-[22px]">🌍</span>
+              <div>
+                <p className="font-syne font-bold text-[17px] text-white">African Languages</p>
+                <p className="text-[13px] text-[#4ade80]/70 mt-0.5">First-class support — not an afterthought</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {AFRICAN_LANGS.map((l) => (
+                <div key={l.code} className="flex items-center gap-2.5 bg-[#0d2b1a] border border-[#1a4a2e] rounded-[10px] px-3.5 py-2.5">
+                  <span className="text-[18px]">{l.flag}</span>
+                  <div>
+                    <p className="text-[13px] font-semibold text-white leading-tight">{l.name}</p>
+                    <p className="text-[11px] text-[#4ade80]/50">{l.region}</p>
+                  </div>
+                  <span className="ml-auto font-mono text-[10px] px-1.5 py-0.5 rounded bg-[#4ade80]/10 text-[#4ade80] border border-[#4ade80]/20">live</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-[10px] bg-[#0d2b1a] border border-[#1a4a2e] px-4 py-3">
+              <p className="font-mono text-[12px] text-[#4ade80]/80 leading-relaxed">
+                Detects names, phone numbers, national IDs, addresses, and financial identifiers
+                written natively in each language — not transliterated, not approximated.
+              </p>
+            </div>
+          </div>
+
+          {/* Right column — global + code sample */}
+          <div className="flex flex-col gap-5">
+            {/* Global languages */}
+            <div className="rounded-[18px] border border-border bg-surface-2 p-6">
+              <p className="text-[12px] font-mono text-ink-5 uppercase tracking-widest mb-4">Also supported</p>
+              <div className="flex flex-wrap gap-2">
+                {GLOBAL_LANGS.map((l) => (
+                  <span key={l} className="font-mono text-[12px] px-2.5 py-1 rounded-[7px] bg-white border border-border text-ink-4">{l}</span>
+                ))}
+                <span className="font-mono text-[12px] px-2.5 py-1 rounded-[7px] bg-blue/8 border border-blue/20 text-blue">+8 more</span>
+              </div>
+            </div>
+
+            {/* Code sample */}
+            <div className="rounded-[18px] border border-border bg-[#060c18] p-6 flex-1">
+              <p className="font-mono text-[11px] text-white/30 uppercase tracking-widest mb-4">workflow · kernel auto-redacts PII</p>
+              <pre className="font-mono text-[13px] leading-[1.85] overflow-x-auto"><code>{[
+                ['keyword', 'Workflow '],['string', '"Customer Support"'],['dim', ' with '],['val', 'message'],['dim', ', '],['val', 'lang'],
+                ['',''],
+                ['comment', '// No PII resolver needed — kernel handles it'],
+                ['comment', '// automatically for all 20+ supported languages'],
+                ['',''],
+                ['keyword', 'Allow resolvers:'],
+                ['dim', '- '],['string', '@o-lang/llm-groq'],
+                ['',''],
+                ['keyword', 'Constraint: '],['dim', 'lang in ['],['string', '"yo"'],['dim', ', '],['string', '"ha"'],['dim', ', '],['string', '"sw"'],['dim', ', '],['string', '"ig"'],['dim', ', '],['string', '"en"'],['dim', ']'],
+                ['',''],
+                ['step', 'Step 1: '],['keyword', 'Ask '],['string', '@o-lang/llm-groq'],['dim', ' "{message}"'],
+                ['comment', '          ↑ kernel redacted PII before this ran'],
+                ['keyword', 'Save as '],['val', 'response'],
+                ['',''],
+                ['keyword', 'Return '],['val', 'response'],
+              ].map(([type, text], i) => {
+                const colors: Record<string,string> = {
+                  keyword: '#60a5fa', string: '#34d399', val: '#fbbf24',
+                  dim: '#475569', step: '#a78bfa', comment: '#334155', '': ''
+                };
+                return text
+                  ? <span key={i} style={{ color: colors[type] || '#e2e8f0' }}>{text}</span>
+                  : <br key={i} />;
+              })}</code></pre>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom stat bar */}
+        <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4 reveal">
+          {[
+            { num: "20+",    label: "Languages supported",       sub: "including 8 African languages" },
+            { num: "8",      label: "African languages — live",  sub: "Yoruba, Igbo, Hausa, Swahili, Zulu, Xhosa, Amharic, Somali" },
+            { num: "1.4B+",  label: "People represented",        sub: "across supported African languages" },
+          ].map((s) => (
+            <div key={s.num} className="rounded-[14px] border border-border bg-surface-2 px-6 py-5 text-center">
+              <p className="font-syne font-extrabold text-[36px] text-blue leading-none mb-1">{s.num}</p>
+              <p className="font-semibold text-[14px] text-ink mb-1">{s.label}</p>
+              <p className="text-[12px] text-ink-4">{s.sub}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ── ECOSYSTEM ──────────────────────────────────────────────────────────────
 const ECOSYSTEM = [
-  { name: "LangChain",      color: "#1a56db", note: "Wrap chain tool calls with O-Lang governance" },
-  { name: "CrewAI",         color: "#059669", note: "Add allowlists and audit trails to agent crews" },
-  { name: "AutoGen",        color: "#7c3aed", note: "Govern multi-agent conversations and tool use" },
-  { name: "OpenAI Agents",  color: "#d97706", note: "Enforce function call contracts cryptographically" },
-  { name: "LlamaIndex",     color: "#0891b2", note: "Govern retrieval pipelines and query tool calls" },
-  { name: "Custom stacks",  color: "#dc2626", note: "Any HTTP-capable runtime — language-agnostic" },
+  { name: "@o-lang/llm-groq",            color: "#1a56db", note: "Governed LLM calls with intent enforcement and output validation" },
+  { name: "@o-lang/bank-account-lookup", color: "#059669", note: "Read-only financial data resolver with audit-signed output" },
+  { name: "@o-lang/icu-admission",        color: "#7c3aed", note: "Clinical workflow resolver with team-scope enforcement" },
+  { name: "@o-lang/semantic-search",      color: "#0891b2", note: "Vector retrieval with schema-validated, typed output" },
+  { name: "@o-lang/legal-extractor",      color: "#d97706", note: "Contract clause extraction with prohibition enforcement" },
+  { name: "your-resolver",               color: "#dc2626", note: "Publish any tool to the registry — HTTP, any language" },
 ];
 
 export function EcosystemSection() {
@@ -125,37 +245,37 @@ export function EcosystemSection() {
     <section className="py-24 px-[5%] bg-surface-2" id="ecosystem">
       <div className="max-w-[1160px] mx-auto">
         <SectionHeader
-          eyebrow="Ecosystem"
-          title={<>O-Lang doesn&apos;t replace<br />your stack — it governs it</>}
-          subtitle="The single biggest mistake AI infrastructure makes is asking developers to start over. O-Lang sits as a thin, enforceable layer above whatever orchestration you already run."
+          eyebrow="Resolver registry"
+          title={<>Every tool is a signed,<br />governed resolver</>}
+          subtitle="O-Lang has its own resolver ecosystem. Each resolver is a versioned, schema-validated package published to the O-Lang registry — not a wrapper around someone else's SDK."
         />
 
         {/* Stack diagram */}
         <div className="mt-14 mb-10 reveal">
           <div className="max-w-[640px] mx-auto">
             <div className="flex flex-col rounded-[16px] overflow-hidden border border-border shadow-sm">
-              <div className="px-6 py-4 bg-surface-3 border-b border-border">
-                <p className="font-mono text-[11px] text-ink-5 uppercase tracking-widest mb-3">your existing orchestration</p>
+              <div className="px-6 py-4 bg-blue/[0.04] border-b border-blue/20">
+                <p className="font-mono text-[11px] text-blue uppercase tracking-widest mb-3">o-lang kernel — your execution layer</p>
                 <div className="flex gap-2 flex-wrap">
-                  {["LangChain", "CrewAI", "AutoGen", "Custom agents"].map((f) => (
-                    <span key={f} className="font-mono text-[12px] px-3 py-1.5 rounded-[8px] bg-white border border-border text-ink-4">{f}</span>
+                  {["✓ .ol workflow", "✓ Allowlist enforced", "✓ Intent verified", "✓ Audit signed"].map((c) => (
+                    <span key={c} className="font-mono text-[12px] px-3 py-1.5 rounded-[8px] bg-blue/8 border border-blue/20 text-blue">{c}</span>
                   ))}
                 </div>
               </div>
               <div className="flex items-center justify-center py-3 bg-white border-b border-border gap-3">
                 <div className="h-px flex-1 bg-border" />
                 <div className="flex items-center gap-2">
-                  <svg viewBox="0 0 16 16" fill="none" stroke="#1a56db" strokeWidth="1.8" className="w-3 h-3"><path d="M8 2v10M4 8l4 4 4-4"/></svg>
-                  <span className="font-mono text-[11px] text-blue font-semibold">tool calls intercepted by O-Lang kernel</span>
-                  <svg viewBox="0 0 16 16" fill="none" stroke="#1a56db" strokeWidth="1.8" className="w-3 h-3"><path d="M8 2v10M4 8l4 4 4-4"/></svg>
+                  <svg viewBox="0 0 16 16" fill="none" stroke="#1a56db" strokeWidth="1.8" className="w-3 h-3"><path d="M8 14V4M4 8l4-4 4 4"/></svg>
+                  <span className="font-mono text-[11px] text-blue font-semibold">resolvers call APIs under kernel contract</span>
+                  <svg viewBox="0 0 16 16" fill="none" stroke="#1a56db" strokeWidth="1.8" className="w-3 h-3"><path d="M8 14V4M4 8l4-4 4 4"/></svg>
                 </div>
                 <div className="h-px flex-1 bg-border" />
               </div>
-              <div className="px-6 py-4 bg-blue/[0.04] border-b border-blue/20">
-                <p className="font-mono text-[11px] text-blue uppercase tracking-widest mb-3">o-lang kernel — governance layer</p>
+              <div className="px-6 py-4 bg-surface-3 border-b border-border">
+                <p className="font-mono text-[11px] text-ink-5 uppercase tracking-widest mb-3">underlying APIs (resolvers call these)</p>
                 <div className="flex gap-2 flex-wrap">
-                  {["✓ Allowlist check", "✓ Intent verify", "✓ Safety filter", "✓ Audit + sign"].map((c) => (
-                    <span key={c} className="font-mono text-[12px] px-3 py-1.5 rounded-[8px] bg-blue/8 border border-blue/20 text-blue">{c}</span>
+                  {["Groq", "OpenAI", "Anthropic", "PostgreSQL", "any HTTP API"].map((f) => (
+                    <span key={f} className="font-mono text-[12px] px-3 py-1.5 rounded-[8px] bg-white border border-border text-ink-4">{f}</span>
                   ))}
                 </div>
               </div>
@@ -216,7 +336,7 @@ const DOMAINS = [
   {
     key: "finance", label: "Finance", bg: "#eff6ff", border: "#bfdbfe", textBg: "FIN", accent: "#1a56db", gradFrom: "#1245b8",
     icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><circle cx="6" cy="15" r="1.5"/></svg>,
-    desc: "Balance inquiries, transaction classification, fraud detection — all with PII validation, hallucination prevention, and audit-ready compliance trails.",
+    desc: "Balance inquiries, transaction classification, fraud detection — with multilingual PII redaction (including Yoruba, Hausa, Swahili), hallucination prevention, and audit-ready compliance trails.",
     pills: ["Bank balance workflow", "Transaction analysis", "AML screening"],
   },
   {
