@@ -59,11 +59,22 @@ export function HeroSection() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.55, delay: 0.18 }}
-        className="text-[clamp(16px,2vw,20px)] text-white/65 max-w-[600px] leading-[1.65] mb-10"
+        className="text-[clamp(16px,2vw,20px)] text-white/65 max-w-[600px] leading-[1.65] mb-4"
       >
         O-Lang is a governed workflow language with its own runtime, tool registry,
         and cryptographic audit layer. Write AI workflows that can&apos;t lie, leak data,
         or exceed their declared scope — from first line to production.
+      </motion.p>
+
+      {/* Compatibility note — reassuring, not the main story */}
+      <motion.p
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.24 }}
+        className="text-[13.5px] text-white/35 max-w-[520px] leading-relaxed mb-10 -mt-4"
+      >
+        Already using LangChain, CrewAI, or OpenAI Agents?{" "}
+        <span className="text-white/55">O-Lang governs their tool calls without replacing them.</span>
       </motion.p>
 
       {/* CTAs */}

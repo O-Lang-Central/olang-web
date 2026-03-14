@@ -37,7 +37,7 @@ const HOW_STEPS = [
     n: "1", color: "#1a56db", bg: "#eff6ff",
     icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1a56db" strokeWidth="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
     title: "Wrap your existing tools",
-    text: "Write a .ol file. Declare your inputs, the resolvers it may call, and the intent scope. The kernel reads this as the authoritative contract — nothing outside it runs.",
+    text: "Write a .ol file. Declare your inputs, the tools it may call, and the intent scope. The kernel reads this as the authoritative contract — nothing outside it runs.",
   },
   {
     n: "2", color: "#059669", bg: "#f0fdf4",
@@ -60,7 +60,7 @@ export function HowItWorksSection() {
         <SectionHeader
           eyebrow="How it works"
           title={<>Write it once.<br />The kernel enforces it forever.</>}
-          subtitle="Declare your workflow in O-Lang. The kernel enforces every resolver call, intent boundary, and safety constraint at runtime — deterministically, with a cryptographic receipt. No framework needed."
+          subtitle="Declare your workflow in O-Lang. The kernel enforces every tool call, intent boundary, and safety constraint at runtime — deterministically, with a cryptographic receipt. No framework needed."
         />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-14 reveal">
           {HOW_STEPS.map((s) => (
@@ -83,7 +83,7 @@ const FEATURES = [
   { color: "#059669", bg: "#f0fdf4", border: "#bbf7d0", tag: "__verified_intent", title: "Verified Intent", text: "Declare scope and prohibited actions. The kernel enforces both before and after execution — zero tolerance for scope creep.", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg> },
   { color: "#7c3aed", bg: "#faf5ff", border: "#e9d5ff", tag: "sha3-256 · ed25519", title: "Cryptographic Audit", text: "Every execution produces a SHA3-256 fingerprint, chained to the previous, and signed with ED25519. Full deterministic proof.", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.8"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 7h6M9 11h6M9 15h4"/></svg> },
   { color: "#d97706", bg: "#fffbeb", border: "#fde68a", tag: "$step.symbol.field", title: "Symbol Resolution", text: "Steps compose with typed symbols. Each tool declares its output schema — downstream steps receive validated, typed data, never raw LLM output.", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg> },
-  { color: "#dc2626", bg: "#fef2f2", border: "#fecaca", tag: "kernel-native · 20+ languages", title: "PII Detection & Safety", text: "The kernel detects and redacts PII automatically on every execution — no extra resolver needed. Covers 20+ languages including Yoruba, Igbo, Hausa, Swahili, and Zulu. Hallucinations and prompt injection blocked at the same layer.", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> },
+  { color: "#dc2626", bg: "#fef2f2", border: "#fecaca", tag: "kernel-native · 20+ languages", title: "PII Detection & Safety", text: "The kernel detects and redacts PII automatically on every execution — no extra tool needed. Covers 20+ languages including Yoruba, Igbo, Hausa, Swahili, and Zulu. Hallucinations and prompt injection blocked at the same layer.", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> },
   { color: "#0891b2", bg: "#ecfeff", border: "#a5f3fc", tag: "@o-lang/tool-name", title: "Tool Registry", text: "Publish, version, and discover tools at olang.cloud/registry. Every tool is signed and schema-validated before listing.", icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="1.8"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg> },
 ];
 
@@ -233,11 +233,11 @@ export function AfricanLanguageSection() {
 // ── ECOSYSTEM ──────────────────────────────────────────────────────────────
 const ECOSYSTEM = [
   { name: "@o-lang/llm-groq",            color: "#1a56db", note: "Governed LLM calls with intent enforcement and output validation" },
-  { name: "@o-lang/bank-account-lookup", color: "#059669", note: "Read-only financial data resolver with audit-signed output" },
-  { name: "@o-lang/icu-admission",        color: "#7c3aed", note: "Clinical workflow resolver with team-scope enforcement" },
+  { name: "@o-lang/bank-account-lookup", color: "#059669", note: "Read-only financial data tool with audit-signed output" },
+  { name: "@o-lang/icu-admission",        color: "#7c3aed", note: "Clinical workflow tool with team-scope enforcement" },
   { name: "@o-lang/semantic-search",      color: "#0891b2", note: "Vector retrieval with schema-validated, typed output" },
   { name: "@o-lang/legal-extractor",      color: "#d97706", note: "Contract clause extraction with prohibition enforcement" },
-  { name: "your-resolver",               color: "#dc2626", note: "Publish any tool to the registry — HTTP, any language" },
+  { name: "your-tool",                   color: "#dc2626", note: "Publish any tool to the registry — HTTP, any language" },
 ];
 
 export function EcosystemSection() {
@@ -245,9 +245,9 @@ export function EcosystemSection() {
     <section className="py-24 px-[5%] bg-surface-2" id="ecosystem">
       <div className="max-w-[1160px] mx-auto">
         <SectionHeader
-          eyebrow="Resolver registry"
-          title={<>Every tool is a signed,<br />governed resolver</>}
-          subtitle="O-Lang has its own resolver ecosystem. Each resolver is a versioned, schema-validated package published to the O-Lang registry — not a wrapper around someone else's SDK."
+          eyebrow="Tool registry"
+          title={<>Every tool is signed,<br />versioned, and governed</>}
+          subtitle="O-Lang has its own tool ecosystem. Each tool (called a resolver internally) is a versioned, schema-validated package published to the O-Lang registry — not a wrapper around someone else's SDK."
         />
 
         {/* Stack diagram */}
@@ -266,13 +266,13 @@ export function EcosystemSection() {
                 <div className="h-px flex-1 bg-border" />
                 <div className="flex items-center gap-2">
                   <svg viewBox="0 0 16 16" fill="none" stroke="#1a56db" strokeWidth="1.8" className="w-3 h-3"><path d="M8 14V4M4 8l4-4 4 4"/></svg>
-                  <span className="font-mono text-[11px] text-blue font-semibold">resolvers call APIs under kernel contract</span>
+                  <span className="font-mono text-[11px] text-blue font-semibold">tools call APIs under kernel contract</span>
                   <svg viewBox="0 0 16 16" fill="none" stroke="#1a56db" strokeWidth="1.8" className="w-3 h-3"><path d="M8 14V4M4 8l4-4 4 4"/></svg>
                 </div>
                 <div className="h-px flex-1 bg-border" />
               </div>
               <div className="px-6 py-4 bg-surface-3 border-b border-border">
-                <p className="font-mono text-[11px] text-ink-5 uppercase tracking-widest mb-3">underlying APIs (resolvers call these)</p>
+                <p className="font-mono text-[11px] text-ink-5 uppercase tracking-widest mb-3">underlying APIs (tools call these)</p>
                 <div className="flex gap-2 flex-wrap">
                   {["Groq", "OpenAI", "Anthropic", "PostgreSQL", "any HTTP API"].map((f) => (
                     <span key={f} className="font-mono text-[12px] px-3 py-1.5 rounded-[8px] bg-white border border-border text-ink-4">{f}</span>
@@ -399,7 +399,7 @@ export function DomainsSection() {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const DOC_CARDS: { href: string; color: string; iconColor: string; title: string; sub: string; specHref?: string; icon: React.ReactNode }[] = [
   { href: "/docs#quickstart", color: "rgba(26,86,219,.25)", iconColor: "#93c5fd", title: "Quickstart Guide", sub: "Install the kernel, write your first .ol file, run it", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" strokeWidth="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> },
-  { href: "/docs#tools", color: "rgba(5,150,105,.25)", iconColor: "#6ee7b7", title: "Building Tools", sub: "Write, schema-validate, and publish tools (resolvers)", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6ee7b7" strokeWidth="1.8"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg> },
+  { href: "/docs#tools", color: "rgba(5,150,105,.25)", iconColor: "#6ee7b7", title: "Building Tools", sub: "Write, schema-validate, and publish tools (resolvers internally)", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6ee7b7" strokeWidth="1.8"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg> },
   { href: "/docs#governance", color: "rgba(124,58,237,.25)", iconColor: "#c4b5fd", title: "Governance Deep Dive", sub: "Intent, allowlists, audit chains, safety policy", icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c4b5fd" strokeWidth="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> },
   { href: "/docs#kernel", color: "rgba(217,119,6,.2)", iconColor: "#fcd34d", title: "Kernel Architecture", sub: "Runtime internals, embedding, self-hosting · v1.1 spec ↗",  icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fcd34d" strokeWidth="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M5.34 18.66l-1.41 1.41M21 12h-2M5 12H3M19.07 19.07l-1.41-1.41M5.34 5.34L3.93 3.93M12 21v-2M12 5V3"/></svg> },
 ];
@@ -466,6 +466,27 @@ export function CtaSection() {
             Star on GitHub
           </Link>
           <Link href="/docs" className="inline-flex items-center gap-2 px-8 py-3.5 text-[15px] font-semibold text-white/80 bg-white/[0.07] border border-white/15 rounded-[10px] hover:bg-white/[0.12] hover:text-white transition-all">Read the docs →</Link>
+        </div>
+
+        {/* Collaboration callout */}
+        <div className="mt-14 inline-flex flex-col items-center gap-3">
+          <div className="h-px w-16 bg-white/10" />
+          <p className="text-[13px] text-white/40 uppercase tracking-widest font-mono">Get in touch</p>
+          <p className="text-[15px] text-white/60 max-w-[440px] leading-relaxed">
+            Interested in research collaborations, enterprise pilots, or integrating O-Lang
+            into your platform?
+          </p>
+          <a
+            href="mailto:info@olang.cloud"
+            className="inline-flex items-center gap-2.5 mt-1 px-5 py-2.5 rounded-[10px] border border-white/15 bg-white/[0.05] hover:bg-white/[0.10] hover:border-white/25 transition-all group"
+          >
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="w-4 h-4 text-blue-muted">
+              <path d="M2.5 5.5h15v10h-15zM2.5 5.5l7.5 6 7.5-6"/>
+            </svg>
+            <span className="font-mono text-[14px] text-white/70 group-hover:text-white transition-colors">
+              info@olang.cloud
+            </span>
+          </a>
         </div>
       </div>
     </section>
