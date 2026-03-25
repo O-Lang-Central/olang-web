@@ -414,7 +414,7 @@ export function DocsTeaserSection() {
             <SectionHeader eyebrow="Documentation" title={<>Everything you need<br />to build governed AI</>} subtitle="From installing the kernel to publishing your first tool — step-by-step guides, API reference, and real-world examples." light />
             <div className="flex gap-2.5 flex-wrap mt-8">
               <Link href="/docs/quickstart" className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-grad-blue rounded-[10px] shadow-blue hover:-translate-y-px hover:shadow-[0_6px_24px_rgba(26,86,219,0.45)] transition-all">Get started in 5 min →</Link>
-              <Link href="/docs/reference" className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white/80 bg-white/[0.07] border border-white/15 rounded-[10px] hover:bg-white/[0.12] hover:text-white transition-all">API Reference</Link>
+              <Link href="/docs#kernel" className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white/80 bg-white/[0.07] border border-white/15 rounded-[10px] hover:bg-white/[0.12] hover:text-white transition-all">API Reference</Link>
             </div>
           </div>
           <div className="flex flex-col gap-3.5">

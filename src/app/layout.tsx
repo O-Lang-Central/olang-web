@@ -3,6 +3,7 @@ import { Syne, DM_Sans, DM_Mono } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import Script from "next/script"; // ← MUST HAVE THIS IMPORT
 
 const syne = Syne({
   subsets: ["latin"],
@@ -59,6 +60,23 @@ export default function RootLayout({
         <Navbar />
         <main>{children}</main>
         <Footer />
+        
+        {/* ✅ GOOGLE ANALYTICS — CLEAN ID, NO TRAILING SPACES */}
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-X0FRK316RG"
+          strategy="afterInteractive"
+        />
+        <Script
+          id="google-analytics"
+          strategy="afterInteractive"
+        >
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-X0FRK316RG');
+          `}
+        </Script>
       </body>
     </html>
   );
