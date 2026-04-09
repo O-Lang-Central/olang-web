@@ -3,11 +3,13 @@ import { StatsStrip, HowItWorksSection, FeaturesSection, AfricanLanguageSection,
 import { RegistryPreview } from "@/components/home/RegistryPreview";
 import { PlaygroundPreview } from "@/components/home/PlaygroundPreview";
 import { ScrollReveal } from "@/components/home/ScrollReveal";
+import { ApplicationsSection } from "@/components/home/ApplicationSection";
 
 export default function HomePage() {
   return (
     <>
       <HeroSection />
+      <ApplicationsSection/>
       <StatsStrip />
       <HowItWorksSection />
       <FeaturesSection />

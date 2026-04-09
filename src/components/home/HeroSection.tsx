@@ -151,5 +151,6 @@ export function HeroSection() {
         </div>
       </motion.div>
     </section>
+    
   );
 }

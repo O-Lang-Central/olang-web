@@ -347,88 +347,138 @@ export function PlaygroundClient() {
   );
 
   // Run workflow
-  const handleRun = useCallback(async () => {
-    const hardErrors = syntaxErrors.filter((e) => e.severity === "error");
-    if (hardErrors.length) {
-      setActiveError(hardErrors[0]);
-      setError(`Fix ${hardErrors.length} syntax error${hardErrors.length > 1 ? "s" : ""} before running.`);
+const handleRun = useCallback(async () => {
+  const hardErrors = syntaxErrors.filter((e) => e.severity === "error");
+  if (hardErrors.length) {
+    setActiveError(hardErrors[0]);
+    setError(`Fix ${hardErrors.length} syntax error${hardErrors.length > 1 ? "s" : ""} before running.`);
+    return;
+  }
+
+  // ✅ PRE-FLIGHT: Validate required inputs for finance domain
+  if (domain === "finance") {
+    const customerId = inputVals.customer_id?.trim();
+    if (!customerId) {
+      setError("⚠️ Please select a Customer ID before running.");
       return;
     }
-    setRunning(true); setError(null);
-    const t0 = Date.now();
+  }
 
-    const payload: Record<string, unknown> = { ...inputVals };
-    cfg.fields.forEach((f) => { if (!payload[f.id]) payload[f.id] = ""; });
-    // bank_db_path is server-side only — inject default silently
-    if (domain === "finance") payload.bank_db_path = payload.bank_db_path || "./bank.db";
-    payload.__kernel = { workflow_id: `wf-${domain}-v1`, runtime_version: "1.1.0", gov_profile_hash: null };
+  setRunning(true); 
+  setError(null);
+  const t0 = Date.now();
 
-    try {
-      const res  = await fetch(`${KERNEL_URL}${cfg.endpoint}`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const ms   = Date.now() - t0;
-      const data = await res.json();
-      const ok   = res.ok && data.ok !== false;
-      const now  = new Date().toISOString();
-      const isSafetyHalt = data.error === "safety_halt";
-      const execHash = data.audit?.execution_hash ?? fakeHash(JSON.stringify(payload) + now);
-
-      // Build safety events — real halt gets a genuine violation block
-      const safetyEvents: Array<{ type: "allow" | "block" | "warn"; message: string; detail: string; timestamp: string }> = isSafetyHalt ? [
-        { type: "allow",   message: "Resolver allowlist check passed",         detail: "allowed_resolvers validated",                        timestamp: now },
-        { type: "allow",   message: "PII validation passed",                   detail: `validator: pii_v2 | domain: ${domain}`,              timestamp: now },
-        { type: "block",   message: "SAFETY HALT — prohibited intent detected",
-          detail: `action: ${data.violation?.action ?? "unknown"} | policy: ${data.violation?.policy ?? cfg.intent.scope} | stage: ${data.violation?.stage ?? "pre_execution_intent_guard"}`,
-          timestamp: now },
-        { type: "block",   message: "Execution blocked before resolver chain", detail: `query: "${data.violation?.triggered?.slice(0, 80) ?? "—"}"`, timestamp: now },
-      ] : [
-        { type: "allow",  message: "Resolver allowlist check passed",       detail: "allowed_resolvers validated",                    timestamp: now },
-        { type: "allow",  message: "PII validation passed",                 detail: `validator: pii_v2 | domain: ${domain}`,          timestamp: now },
-        { type: ok ? "allow" : "block",
-          message: ok ? "Execution completed without policy violations" : "Policy violation detected",
-          detail: `fingerprint: ${execHash.slice(9, 36)}…`, timestamp: now },
-      ];
-
-      setResult({
-        ok,
-        response: ok ? (data.response ?? "Execution successful") : undefined,
-        error:    !ok ? (data.message ?? data.error ?? "Blocked by governance policy") : undefined,
-        violation: isSafetyHalt ? data.violation : undefined,
-        steps: [{
-          step: 1, resolver: cfg.fields[0]?.id ?? "resolver",
-          status: ok ? "allowed" : "blocked",
-          input:  inputVals[cfg.fields[0]?.id] ?? "—",
-          policy_check: `allowlist_match ${ok ? "✓" : "✗"}`,
-          timestamp: now,
-        }],
-        audit: {
-          execution_hash:   execHash,
-          prev_hash:        data.audit?.previous_hash ?? fakeHash("prev" + now),
-          kernel_signature: data.audit?.signature     ?? `ed25519:${fakeHash("sig" + now).slice(9, 48)}…`,
-          workflow_hash:    data.audit?.merkle_root   ?? fakeHash(`wf-${domain}-v1`),
-          timestamp: now, latency_ms: ms,
-        },
-        safety: { events: safetyEvents },
-        intent: {
-          scope:       cfg.intent.scope,
-          prohibited:  cfg.intent.prohibited,
-          enforcement: [
-            `Scope validation: ${ok ? "PASSED" : "FAILED"}`,
-            `Prohibited check: ${isSafetyHalt ? `1 VIOLATION — ${data.violation?.action ?? "unknown"}` : ok ? "0 violations" : "1 violation"}`,
-            `Output: ${ok ? "CLEAN" : "VIOLATION"}`,
-          ],
-          fingerprint: fakeHash(cfg.intent.scope + now),
-        },
-      });
-      setTab(isSafetyHalt ? "customer" : "customer");
-    } catch {
-      setError(`Cannot reach kernel at ${KERNEL_URL}. Is olang-server running on port 3001?`);
-    } finally {
-      setRunning(false);
+  // ✅ BUILD PAYLOAD: Filter out empty/whitespace values
+  const payload: Record<string, unknown> = {};
+  
+  // Only include input values that are non-empty strings or non-string values
+  Object.entries(inputVals).forEach(([key, value]) => {
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed !== "") {
+        payload[key] = trimmed;
+      }
+    } else if (value !== undefined && value !== null) {
+      payload[key] = value;
     }
-  }, [code, domain, inputVals, cfg, syntaxErrors]);
+  });
+
+  // ✅ Finance domain: inject server-side default for bank_db_path
+  if (domain === "finance") {
+    payload.bank_db_path = payload.bank_db_path || "./bank.db";
+  }
+
+  // ✅ Add kernel metadata (harmless extra fields)
+  payload.__kernel = { 
+    workflow_id: `wf-${domain}-v1`, 
+    runtime_version: "1.2.20-alpha", 
+    gov_profile_hash: null 
+  };
+
+  // 🔍 DEBUG: Log payload before sending (remove in production)
+  console.log("🔍 Sending payload:", {
+    domain,
+    endpoint: cfg.endpoint,
+    payload,
+    customer_id_present: !!payload.customer_id,
+    customer_id_value: payload.customer_id
+  });
+
+  try {
+    const res = await fetch(`${KERNEL_URL}${cfg.endpoint}`, {
+      method: "POST", 
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    
+    const ms = Date.now() - t0;
+    const data = await res.json();
+    const ok = res.ok && data.ok !== false;
+    const now = new Date().toISOString();
+    const isSafetyHalt = data.error === "safety_halt";
+    const execHash = data.audit?.execution_hash ?? fakeHash(JSON.stringify(payload) + now);
+
+    // Build safety events — real halt gets a genuine violation block
+    const safetyEvents: Array<{ type: "allow" | "block" | "warn"; message: string; detail: string; timestamp: string }> = isSafetyHalt ? [
+      { type: "allow",   message: "Resolver allowlist check passed",         detail: "allowed_resolvers validated",                        timestamp: now },
+      { type: "allow",   message: "PII validation passed",                   detail: `validator: pii_v2 | domain: ${domain}`,              timestamp: now },
+      { type: "block",   message: "SAFETY HALT — prohibited intent detected",
+        detail: `action: ${data.violation?.action ?? "unknown"} | policy: ${data.violation?.policy ?? cfg.intent.scope} | stage: ${data.violation?.stage ?? "pre_execution_intent_guard"}`,
+        timestamp: now },
+      { type: "block",   message: "Execution blocked before resolver chain", detail: `query: "${data.violation?.triggered?.slice(0, 80) ?? "—"}"`, timestamp: now },
+    ] : [
+      { type: "allow",  message: "Resolver allowlist check passed",       detail: "allowed_resolvers validated",                    timestamp: now },
+      { type: "allow",  message: "PII validation passed",                 detail: `validator: pii_v2 | domain: ${domain}`,          timestamp: now },
+      { type: ok ? "allow" : "block",
+        message: ok ? "Execution completed without policy violations" : "Policy violation detected",
+        detail: `fingerprint: ${execHash.slice(9, 36)}…`, timestamp: now },
+    ];
+
+    setResult({
+      ok,
+      response: ok ? (data.response ?? "Execution successful") : undefined,
+      error:    !ok ? (data.message ?? data.error ?? "Blocked by governance policy") : undefined,
+      violation: isSafetyHalt ? data.violation : undefined,
+      steps: [{
+        step: 1, resolver: cfg.fields[0]?.id ?? "resolver",
+        status: ok ? "allowed" : "blocked",
+        input:  inputVals[cfg.fields[0]?.id] ?? "—",
+        policy_check: `allowlist_match ${ok ? "✓" : "✗"}`,
+        timestamp: now,
+      }],
+      audit: {
+        execution_hash:   execHash,
+        prev_hash:        data.audit?.previous_hash ?? fakeHash("prev" + now),
+        kernel_signature: data.audit?.signature     ?? `ed25519:${fakeHash("sig" + now).slice(9, 48)}…`,
+        workflow_hash:    data.audit?.merkle_root   ?? fakeHash(`wf-${domain}-v1`),
+        timestamp: now, latency_ms: ms,
+      },
+      safety: { events: safetyEvents },
+      intent: {
+        scope:       cfg.intent.scope,
+        prohibited:  cfg.intent.prohibited,
+        enforcement: [
+          `Scope validation: ${ok ? "PASSED" : "FAILED"}`,
+          `Prohibited check: ${isSafetyHalt ? `1 VIOLATION — ${data.violation?.action ?? "unknown"}` : ok ? "0 violations" : "1 violation"}`,
+          `Output: ${ok ? "CLEAN" : "VIOLATION"}`,
+        ],
+        fingerprint: fakeHash(cfg.intent.scope + now),
+      },
+    });
+    setTab(isSafetyHalt ? "customer" : "customer");
+    
+  } catch (err) {
+    // 🔍 DEBUG: Log full error details
+    console.error("🔍 Fetch error:", {
+      name: (err as Error).name,
+      message: (err as Error).message,
+      stack: (err as Error).stack
+    });
+    setError(`Cannot reach kernel at ${KERNEL_URL}. Is olang-server running on port 3001?`);
+  } finally {
+    setRunning(false);
+  }
+}, [code, domain, inputVals, cfg, syntaxErrors]);
 
   // ── Design tokens ────────────────────────────────────────────────────────────
   const BG       = "#070d1a";
