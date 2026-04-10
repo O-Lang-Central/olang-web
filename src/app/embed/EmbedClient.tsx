@@ -3,7 +3,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 
-const API_URL = process.env.NEXT_PUBLIC_OLANG_API_URL || 'http://localhost:3001';
+const API_URL = process.env.NEXT_PUBLIC_KERNEL_URL || 'http://localhost:3001';
 
 const AVATAR_OPTIONS = [
   '🤖', '🧠', '✨', '🔮', '🛡️', '⚡', '🌟', '💬',
