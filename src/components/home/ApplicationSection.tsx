@@ -30,7 +30,7 @@ export function ApplicationsSection() {
             </div>
             <h3 className="font-syne text-[19px] font-bold text-ink mb-2.5">Financial Services</h3>
             <p className="text-[15px] text-ink-4 leading-relaxed mb-4">
-              Safe customer assistants that answer balance questions, explain policies, and block unauthorized transfers — in English, Yoruba, Hausa, Igbo & more.
+              Safe customer assistants that answer balance questions, explain policies, and block unauthorized transfers — in English, Yoruba, Swahili, Zulu & more.
             </p>
             
             <div className="bg-[#060c18] border border-border rounded-[10px] p-3 mb-5">
@@ -44,7 +44,7 @@ export function ApplicationsSection() {
             </div>
             
             <Link 
-              href="/embed" 
+              href="/playground" 
               className="inline-flex items-center gap-2 text-[15px] font-semibold text-blue-400 hover:text-blue-300 transition-colors"
             >
               Try the Finance Chatbot →
