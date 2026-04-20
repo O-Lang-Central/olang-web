@@ -4,6 +4,7 @@
 import { useState, useRef, useEffect } from 'react';
 
 const API_URL = process.env.NEXT_PUBLIC_KERNEL_URL || 'http://localhost:3001';
+const API_BASE = process.env.NEXT_PUBLIC_KERNEL_URL || 'http://localhost:3001'; 
 
 const AVATAR_OPTIONS = [
   '🤖', '🧠', '✨', '🔮', '🛡️', '⚡', '🌟', '💬',
@@ -760,7 +761,7 @@ export default function EmbedClient() {
             GOVERNED AI · OLANG KERNEL
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-3 font-sans tracking-tight">
-            Embed O-Lang Chatbot
+            Embed O-Lang Powered Chatbot
           </h1>
           <p className="text-lg text-gray-500 max-w-2xl mx-auto font-sans">
             Add a governed AI assistant to any website in 60 seconds. No framework required — just paste one script tag.
@@ -1185,9 +1186,58 @@ export default function EmbedClient() {
         </div>
 
         {/* ── FRAMEWORK SNIPPETS — now full-width ── */}
-        <div className="max-w-5xl mx-auto mt-8">
-          <CodeSnippetsPanel embedCode={embedCode} config={config} />
+    {/* ── FRAMEWORK SNIPPETS — now full-width ── */}
+<div className="max-w-5xl mx-auto mt-8">
+  <CodeSnippetsPanel embedCode={embedCode} config={config} />
+</div>
+
+{/* ── NEW: API Docs Card ───────────────────────────────────── */}
+<div className="max-w-5xl mx-auto mt-6">
+  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <div className="flex items-start justify-between">
+      <div>
+        <h2 className="text-base font-semibold text-gray-900 font-sans mb-1">📚 API Documentation</h2>
+        <p className="text-xs text-gray-500 font-sans mb-3">
+          Explore all endpoints, authentication, and examples in our interactive OpenAPI spec.
+        </p>
+        <a 
+          href={`${API_BASE}/docs`} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium font-sans"
+        >
+          Open Interactive Docs
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          </svg>
+        </a>
+      </div>
+      <div className="hidden md:block text-right">
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-mono border border-emerald-200">
+          ✓ Live
+        </span>
+        <p className="text-[10px] text-gray-400 mt-1 font-mono">{API_BASE}/docs</p>
+      </div>
+    </div>
+    
+    {/* Feature highlights */}
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 pt-4 border-t border-gray-100">
+      {[
+        { icon: '🔐', label: 'Auth Examples' },
+        { icon: '🧪', label: 'Try It Out' },
+        { icon: '📦', label: 'Request/Response' },
+        { icon: '🔍', label: 'Verify Hashes' },
+      ].map(({ icon, label }) => (
+        <div key={label} className="flex items-center gap-2 text-xs text-gray-600">
+          <span className="text-lg">{icon}</span>
+          <span>{label}</span>
         </div>
+      ))}
+    </div>
+  </div>
+</div>
+
+{/* ── END API Docs Card ───────────────────────────────────── */}
 
       </div>
     </div>

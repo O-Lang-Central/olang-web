@@ -66,7 +66,7 @@ export function HeroSection() {
         or exceed their declared scope — from first line to production.
       </motion.p>
 
-      {/* Compatibility note — reassuring, not the main story */}
+      {/* Compatibility note */}
       <motion.p
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -82,7 +82,7 @@ export function HeroSection() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.55, delay: 0.26 }}
-        className="flex gap-3 justify-center flex-wrap mb-16"
+        className="flex gap-3 justify-center flex-wrap mb-6"
       >
         <Link
           href="/playground"
@@ -100,11 +100,53 @@ export function HeroSection() {
         </Link>
       </motion.div>
 
+      {/* ── ISO compliance trust strip ────────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, delay: 0.32 }}
+        className="flex items-center gap-2.5 flex-wrap justify-center mb-14"
+      >
+        {[
+          { label: "ISO 42001", sub: "AI Management" },
+          { label: "ISO 27001", sub: "Information Security" },
+        ].map(({ label, sub }) => (
+          <div
+            key={label}
+            className="inline-flex items-center gap-2 bg-white/[0.04] border border-white/[0.10] rounded-full px-3.5 py-1.5"
+          >
+            {/* Checkmark circle */}
+            <svg viewBox="0 0 14 14" className="w-3.5 h-3.5 shrink-0" fill="none">
+              <circle cx="7" cy="7" r="6" stroke="rgba(96,165,250,0.55)" strokeWidth="1.2" />
+              <path
+                d="M4.5 7l1.8 1.8L9.5 5"
+                stroke="rgba(96,165,250,0.85)"
+                strokeWidth="1.3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className="font-mono text-[11px] text-white/55 tracking-[0.3px]">
+              {label}
+              <span className="text-white/30 ml-1.5">· {sub}</span>
+            </span>
+          </div>
+        ))}
+
+        {/* Separator dot */}
+        <span className="w-1 h-1 rounded-full bg-white/15" />
+
+        {/* Aligned label */}
+        <span className="font-mono text-[11px] text-white/25 tracking-[0.5px]">
+          aligned
+        </span>
+      </motion.div>
+
       {/* Code window */}
       <motion.div
         initial={{ opacity: 0, y: 28 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.38 }}
+        transition={{ duration: 0.6, delay: 0.42 }}
         className="w-full max-w-[820px]"
       >
         <div className="code-window">
@@ -151,6 +193,5 @@ export function HeroSection() {
         </div>
       </motion.div>
     </section>
-    
   );
 }

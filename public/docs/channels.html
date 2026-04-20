@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Channel Integrations — O-Lang Docs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;1,400&family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0A0E1A;
+    --surface:   #0F1525;
+    --surface2:  #141C30;
+    --border:    #1E2A45;
+    --border2:   #253354;
+    --teal:      #00D4C8;
+    --teal-dim:  #00897F;
+    --gold:      #F0A500;
+    --gold-dim:  #8A5F00;
+    --green:     #00E676;
+    --red:       #FF5252;
+    --blue:      #4FC3F7;
+    --text:      #E8EDF8;
+    --text-mid:  #8A9BC4;
+    --text-dim:  #4A5878;
+    --font-head: 'Syne', sans-serif;
+    --font-body: 'DM Sans', sans-serif;
+    --font-code: 'IBM Plex Mono', monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.7;
+    min-height: 100vh;
+  }
+
+  /* ── GRID TEXTURE ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.25;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── LAYOUT ── */
+  .wrapper {
+    position: relative; z-index: 1;
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    min-height: 100vh;
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    position: sticky; top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    border-right: 1px solid var(--border);
+    padding: 32px 0;
+    background: var(--surface);
+  }
+
+  .sidebar-logo {
+    padding: 0 24px 28px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+
+  .logo-mark {
+    font-family: var(--font-head);
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--teal);
+    letter-spacing: -0.5px;
+  }
+
+  .logo-sub {
+    font-family: var(--font-code);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  .nav-section {
+    padding: 0 16px;
+    margin-bottom: 24px;
+  }
+
+  .nav-label {
+    font-family: var(--font-code);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 0 8px;
+    margin-bottom: 8px;
+  }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--text-mid);
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.15s;
+  }
+
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: rgba(0, 212, 200, 0.08); color: var(--teal); }
+
+  .nav-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--border2); flex-shrink: 0;
+  }
+  .nav-item.active .nav-dot { background: var(--teal); }
+
+  /* ── MAIN CONTENT ── */
+  .main {
+    padding: 56px 64px;
+    max-width: 900px;
+  }
+
+  /* ── BREADCRUMB ── */
+  .breadcrumb {
+    font-family: var(--font-code);
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+    margin-bottom: 32px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .breadcrumb span { color: var(--text-dim); }
+  .breadcrumb .sep { color: var(--border2); }
+  .breadcrumb .current { color: var(--teal); }
+
+  /* ── PAGE HEADER ── */
+  .page-header {
+    margin-bottom: 48px;
+    padding-bottom: 40px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .page-tag {
+    font-family: var(--font-code);
+    font-size: 11px;
+    color: var(--teal);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .page-title {
+    font-family: var(--font-head);
+    font-size: 42px;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1.1;
+    letter-spacing: -1px;
+    margin-bottom: 16px;
+  }
+
+  .page-title span { color: var(--teal); }
+
+  .page-desc {
+    font-size: 16px;
+    color: var(--text-mid);
+    font-weight: 300;
+    max-width: 600px;
+    line-height: 1.7;
+  }
+
+  /* ── PHILOSOPHY CALLOUT ── */
+  .philosophy {
+    background: linear-gradient(135deg, rgba(0,212,200,0.05), rgba(240,165,0,0.05));
+    border: 1px solid var(--border2);
+    border-left: 3px solid var(--gold);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 48px;
+  }
+
+  .philosophy p {
+    font-size: 14px;
+    color: var(--text-mid);
+    line-height: 1.7;
+  }
+
+  .philosophy strong { color: var(--gold); font-weight: 500; }
+
+  /* ── PATTERN DIAGRAM ── */
+  .pattern-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px 32px;
+    margin-bottom: 48px;
+    font-family: var(--font-code);
+  }
+
+  .pattern-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  .pattern-flow {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--text-mid);
+  }
+
+  .flow-step {
+    display: flex; align-items: center; gap: 12px;
+  }
+
+  .flow-node {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .flow-node.highlight { border-color: var(--teal); color: var(--teal); }
+  .flow-node.channel  { border-color: var(--gold); color: var(--gold); }
+
+  .flow-arrow {
+    color: var(--text-dim);
+    font-size: 16px;
+  }
+
+  .flow-note {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-left: 4px;
+  }
+
+  /* ── SECTION ── */
+  .section {
+    margin-bottom: 64px;
+  }
+
+  /* ── CHANNEL CARD ── */
+  .channel-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 64px;
+  }
+
+  .channel-header {
+    display: flex; align-items: center; gap: 16px;
+    padding: 24px 32px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .channel-icon {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+
+  .whatsapp-icon { background: rgba(37, 211, 102, 0.1); border: 1px solid rgba(37,211,102,0.2); }
+  .telegram-icon { background: rgba(41, 182, 246, 0.1); border: 1px solid rgba(41,182,246,0.2); }
+
+  .channel-meta { flex: 1; }
+
+  .channel-name {
+    font-family: var(--font-head);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.5px;
+  }
+
+  .channel-tagline {
+    font-size: 13px;
+    color: var(--text-mid);
+    margin-top: 2px;
+  }
+
+  .channel-badge {
+    font-family: var(--font-code);
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .badge-free { background: rgba(0,230,118,0.1); color: var(--green); border: 1px solid rgba(0,230,118,0.2); }
+  .badge-free-label::before { content: '✓ '; }
+
+  .channel-body { padding: 32px; }
+
+  /* ── STEPS ── */
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-bottom: 32px;
+  }
+
+  .step {
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    gap: 16px;
+    padding-bottom: 28px;
+    position: relative;
+  }
+
+  .step:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    left: 19px; top: 40px; bottom: 0;
+    width: 2px;
+    background: var(--border);
+  }
+
+  .step-num {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-code);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--teal);
+    flex-shrink: 0;
+    z-index: 1;
+  }
+
+  .step-content { padding-top: 8px; }
+
+  .step-title {
+    font-family: var(--font-head);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  .step-desc {
+    font-size: 13px;
+    color: var(--text-mid);
+    line-height: 1.6;
+    margin-bottom: 12px;
+  }
+
+  /* ── CODE BLOCKS ── */
+  .code-wrap {
+    background: #080C16;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 12px 0;
+    font-family: var(--font-code);
+    font-size: 12.5px;
+    line-height: 1.8;
+  }
+
+  .code-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .code-lang {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  .copy-btn {
+    font-family: var(--font-code);
+    font-size: 10px;
+    color: var(--text-dim);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 3px 10px;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: all 0.15s;
+  }
+
+  .copy-btn:hover { color: var(--teal); border-color: var(--teal); }
+  .copy-btn.copied { color: var(--green); border-color: var(--green); }
+
+  .code-body {
+    padding: 20px;
+    overflow-x: auto;
+    color: var(--text-mid);
+  }
+
+  /* Syntax highlight classes */
+  .kw  { color: #C792EA; }  /* keywords */
+  .fn  { color: #82AAFF; }  /* functions */
+  .str { color: #C3E88D; }  /* strings */
+  .cm  { color: var(--text-dim); font-style: italic; }  /* comments */
+  .num { color: #F78C6C; }  /* numbers */
+  .key { color: var(--teal); }  /* object keys */
+  .op  { color: #89DDFF; }  /* operators */
+
+  /* ── ENV VARS TABLE ── */
+  .env-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-code);
+    font-size: 12px;
+    margin: 16px 0;
+  }
+
+  .env-table th {
+    text-align: left;
+    padding: 8px 16px;
+    background: var(--surface);
+    color: var(--text-dim);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .env-table td {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  .env-table tr:last-child td { border-bottom: none; }
+  .env-table .var-name { color: var(--teal); }
+  .env-table .var-desc { color: var(--text-mid); font-family: var(--font-body); font-size: 12px; }
+  .env-table .var-src  { color: var(--gold); font-size: 11px; }
+
+  /* ── CALLOUT ── */
+  .callout {
+    display: flex; gap: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    font-size: 13px;
+    color: var(--text-mid);
+  }
+
+  .callout-icon { flex-shrink: 0; font-size: 16px; margin-top: 1px; }
+  .callout.info  { border-left: 3px solid var(--blue); }
+  .callout.warn  { border-left: 3px solid var(--gold); }
+  .callout.tip   { border-left: 3px solid var(--teal); }
+  .callout a { color: var(--teal); text-decoration: none; }
+  .callout a:hover { text-decoration: underline; }
+
+  /* ── DIVIDER ── */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 48px 0;
+  }
+
+  /* ── FOOTER ── */
+  .doc-footer {
+    margin-top: 64px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  .footer-links { display: flex; gap: 24px; }
+  .footer-links a { color: var(--text-dim); text-decoration: none; transition: color 0.15s; }
+  .footer-links a:hover { color: var(--teal); }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--teal-dim); }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .channel-card {
+    animation: fadeUp 0.4s ease both;
+  }
+
+  .channel-card:nth-child(2) { animation-delay: 0.1s; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 768px) {
+    .wrapper { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .main { padding: 32px 24px; }
+    .page-title { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrapper">
+
+  <!-- ── SIDEBAR ─────────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">O-Lang</div>
+      <div class="logo-sub">Documentation</div>
+    </div>
+
+    <nav class="nav-section">
+      <div class="nav-label">Getting Started</div>
+      <a class="nav-item" href="#"><span class="nav-dot"></span>Introduction</a>
+      <a class="nav-item" href="#"><span class="nav-dot"></span>Quick Start</a>
+      <a class="nav-item" href="#"><span class="nav-dot"></span>Core Concepts</a>
+    </nav>
+
+    <nav class="nav-section">
+      <div class="nav-label">Platform</div>
+      <a class="nav-item" href="#"><span class="nav-dot"></span>Runtime Kernel</a>
+      <a class="nav-item" href="#"><span class="nav-dot"></span>Resolver Registry</a>
+      <a class="nav-item" href="#"><span class="nav-dot"></span>Conformance Suite</a>
+      <a class="nav-item" href="#"><span class="nav-dot"></span>Audit Trail</a>
+    </nav>
+
+    <nav class="nav-section">
+      <div class="nav-label">Deploy</div>
+      <a class="nav-item" href="#"><span class="nav-dot"></span>Embed Widget</a>
+      <a class="nav-item" href="#"><span class="nav-dot"></span>Cloud API</a>
+      <a class="nav-item active" href="#"><span class="nav-dot"></span>Channel Integrations</a>
+    </nav>
+
+    <nav class="nav-section">
+      <div class="nav-label">Channels</div>
+      <a class="nav-item" href="#whatsapp"><span class="nav-dot"></span>WhatsApp</a>
+      <a class="nav-item" href="#telegram"><span class="nav-dot"></span>Telegram</a>
+      <a class="nav-item" href="#"><span class="nav-dot"></span>Slack (coming soon)</a>
+      <a class="nav-item" href="#"><span class="nav-dot"></span>Custom Webhook</a>
+    </nav>
+
+    <nav class="nav-section">
+      <div class="nav-label">Resolvers</div>
+      <a class="nav-item" href="#"><span class="nav-dot"></span>Building Resolvers</a>
+      <a class="nav-item" href="#"><span class="nav-dot"></span>Publishing</a>
+      <a class="nav-item" href="#"><span class="nav-dot"></span>Conformance Tests</a>
+    </nav>
+  </aside>
+
+  <!-- ── MAIN ─────────────────────────────────────────────────── -->
+  <main class="main">
+
+    <div class="breadcrumb">
+      <span>Docs</span>
+      <span class="sep">/</span>
+      <span>Deploy</span>
+      <span class="sep">/</span>
+      <span class="current">Channel Integrations</span>
+    </div>
+
+    <!-- Page Header -->
+    <header class="page-header">
+      <div class="page-tag">Deploy / Channels</div>
+      <h1 class="page-title">Connect O-Lang to<br><span>any channel</span></h1>
+      <p class="page-desc">
+        O-Lang is governed AI infrastructure — not a chatbot platform.
+        It exposes a single <code style="font-family:var(--font-code);font-size:13px;color:var(--teal)">/run</code> endpoint.
+        You own the channel. These guides show you how to wire them together.
+      </p>
+    </header>
+
+    <!-- Philosophy -->
+    <div class="philosophy">
+      <p>
+        <strong>O-Lang's role is the runtime.</strong> Every message your users send —
+        whether on WhatsApp, Telegram, or your own website — passes through the O-Lang kernel,
+        gets vector-searched against your documents, runs through your governed chain,
+        and returns a cryptographically signed, PII-masked response.
+        The channel is your responsibility. The governance is ours.
+      </p>
+    </div>
+
+    <!-- The Pattern -->
+    <div class="section">
+      <div class="pattern-box">
+        <div class="pattern-label">Universal Integration Pattern</div>
+        <div class="pattern-flow">
+          <div class="flow-step">
+            <div class="flow-node channel">Channel (WhatsApp / Telegram / etc.)</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-note">message arrives</div>
+          </div>
+          <div class="flow-step" style="padding-left:20px;color:var(--border2)">│</div>
+          <div class="flow-step">
+            <div class="flow-node">Your webhook handler</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-note">extract text, identify user</div>
+          </div>
+          <div class="flow-step" style="padding-left:20px;color:var(--border2)">│</div>
+          <div class="flow-step">
+            <div class="flow-node highlight">POST /run → O-Lang kernel</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-note">RAG + governance + audit signing</div>
+          </div>
+          <div class="flow-step" style="padding-left:20px;color:var(--border2)">│</div>
+          <div class="flow-step">
+            <div class="flow-node">Your reply handler</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-note">send governed response back</div>
+          </div>
+          <div class="flow-step" style="padding-left:20px;color:var(--border2)">│</div>
+          <div class="flow-step">
+            <div class="flow-node channel">User receives answer</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-note">with full audit trail in your dashboard</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- WHATSAPP                                                  -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div id="whatsapp" class="channel-card">
+      <div class="channel-header">
+        <div class="channel-icon whatsapp-icon">💬</div>
+        <div class="channel-meta">
+          <div class="channel-name">WhatsApp</div>
+          <div class="channel-tagline">Meta Cloud API · 3 billion users · No SDK required</div>
+        </div>
+        <div class="channel-badge badge-free badge-free-label">Free API</div>
+      </div>
+
+      <div class="channel-body">
+
+        <div class="callout info">
+          <span class="callout-icon">ℹ️</span>
+          <div>
+            Meta's Cloud API is free to use. You only pay Meta's conversation fees
+            (~$0.01–0.05 per 24hr window). Since July 2025, service conversations
+            (customer-initiated) are <strong style="color:var(--green)">completely free</strong>.
+            No Twilio. No middleware. Direct to Meta.
+          </div>
+        </div>
+
+        <div class="steps">
+
+          <!-- Step 1 -->
+          <div class="step">
+            <div class="step-num">01</div>
+            <div class="step-content">
+              <div class="step-title">Create a Meta Developer App</div>
+              <div class="step-desc">
+                Go to <strong style="color:var(--teal)">developers.facebook.com</strong> → My Apps → Create App.
+                Choose <em>Business</em> as the type. Add the <em>WhatsApp</em> product.
+                This creates your WhatsApp Business Account (WABA) automatically.
+              </div>
+              <div class="callout tip">
+                <span class="callout-icon">💡</span>
+                <div>Meta provides a free test phone number for development. Use it to test your integration before connecting a real business number.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="step">
+            <div class="step-num">02</div>
+            <div class="step-content">
+              <div class="step-title">Generate a permanent access token</div>
+              <div class="step-desc">
+                In Business Settings → Users → System Users → Add. Name it anything, role: Admin.
+                Click Generate Token, select your app, grant
+                <code style="color:var(--teal);font-family:var(--font-code);font-size:12px">whatsapp_business_messaging</code> and
+                <code style="color:var(--teal);font-family:var(--font-code);font-size:12px">whatsapp_business_management</code> permissions.
+                This token never expires.
+              </div>
+              <div class="callout warn">
+                <span class="callout-icon">⚠️</span>
+                <div>The token shown in the API Setup panel is temporary (expires in hours). Always use a System User token in production.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="step">
+            <div class="step-num">03</div>
+            <div class="step-content">
+              <div class="step-title">Set your webhook URL</div>
+              <div class="step-desc">
+                In your Meta app → WhatsApp → Configuration → Edit. Set the Callback URL to your server
+                and choose a Verify Token (any string you decide — store it as an env var).
+                Subscribe to the <strong style="color:var(--text)">messages</strong> field.
+              </div>
+              <div class="code-wrap">
+                <div class="code-header">
+                  <span class="code-lang">Callback URL</span>
+                </div>
+                <div class="code-body">
+                  https://your-server.com<span class="key">/webhook/whatsapp</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 4 -->
+          <div class="step">
+            <div class="step-num">04</div>
+            <div class="step-content">
+              <div class="step-title">Add environment variables</div>
+              <table class="env-table">
+                <thead>
+                  <tr>
+                    <th>Variable</th>
+                    <th>Description</th>
+                    <th>Where to find it</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="var-name">META_APP_SECRET</td>
+                    <td class="var-desc">Signs webhook payloads — verifies requests are genuinely from Meta</td>
+                    <td class="var-src">App Settings → Basic</td>
+                  </tr>
+                  <tr>
+                    <td class="var-name">META_VERIFY_TOKEN</td>
+                    <td class="var-desc">Your chosen string — must match what you entered in Meta dashboard</td>
+                    <td class="var-src">You choose this</td>
+                  </tr>
+                  <tr>
+                    <td class="var-name">META_ACCESS_TOKEN</td>
+                    <td class="var-desc">System user permanent token for sending messages</td>
+                    <td class="var-src">System Users → Generate Token</td>
+                  </tr>
+                  <tr>
+                    <td class="var-name">META_PHONE_NUMBER_ID</td>
+                    <td class="var-desc">Identifies which business number to send from</td>
+                    <td class="var-src">WhatsApp → API Setup</td>
+                  </tr>
+                  <tr>
+                    <td class="var-name">OLANG_API_KEY</td>
+                    <td class="var-desc">Your O-Lang cloud API key</td>
+                    <td class="var-src">olang.cloud → Dashboard</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Step 5 -->
+          <div class="step">
+            <div class="step-num">05</div>
+            <div class="step-content">
+              <div class="step-title">Add the webhook handler to your server</div>
+              <div class="step-desc">
+                Copy this into your Node.js server. It handles webhook verification,
+                parses incoming messages, calls O-Lang, and sends the reply back to Meta.
+              </div>
+
+              <div class="code-wrap">
+                <div class="code-header">
+                  <span class="code-lang">JavaScript · Node.js</span>
+                  <button class="copy-btn" onclick="copyCode(this, 'wa-code')">copy</button>
+                </div>
+                <div class="code-body" id="wa-code"><span class="kw">import</span> express <span class="kw">from</span> <span class="str">'express'</span>;
+<span class="kw">import</span> crypto  <span class="kw">from</span> <span class="str">'crypto'</span>;
+
+<span class="kw">const</span> app = <span class="fn">express</span>();
+app.<span class="fn">use</span>(express.<span class="fn">json</span>());
+
+<span class="cm">// ── Verify webhook (GET) — Meta calls this once on setup ──</span>
+app.<span class="fn">get</span>(<span class="str">'/webhook/whatsapp'</span>, (req, res) => {
+  <span class="kw">const</span> mode      = req.query[<span class="str">'hub.mode'</span>];
+  <span class="kw">const</span> token     = req.query[<span class="str">'hub.verify_token'</span>];
+  <span class="kw">const</span> challenge = req.query[<span class="str">'hub.challenge'</span>];
+
+  <span class="kw">if</span> (mode === <span class="str">'subscribe'</span> &amp;&amp; token === process.env.<span class="key">META_VERIFY_TOKEN</span>) {
+    <span class="kw">return</span> res.<span class="fn">send</span>(challenge); <span class="cm">// must return as plain text</span>
+  }
+  res.<span class="fn">sendStatus</span>(<span class="num">403</span>);
+});
+
+<span class="cm">// ── Receive messages (POST) ──────────────────────────────</span>
+app.<span class="fn">post</span>(<span class="str">'/webhook/whatsapp'</span>, <span class="kw">async</span> (req, res) => {
+  res.<span class="fn">sendStatus</span>(<span class="num">200</span>); <span class="cm">// respond immediately — Meta retries otherwise</span>
+
+  <span class="kw">const</span> change  = req.body?.entry?.[<span class="num">0</span>]?.changes?.[<span class="num">0</span>]?.value;
+  <span class="kw">const</span> message = change?.messages?.[<span class="num">0</span>];
+  <span class="kw">if</span> (!message || message.type !== <span class="str">'text'</span>) <span class="kw">return</span>;
+
+  <span class="kw">const</span> from          = message.from;
+  <span class="kw">const</span> phoneNumberId = change.metadata.phone_number_id;
+  <span class="kw">const</span> userText      = message.text.body;
+
+  <span class="cm">// ── Call O-Lang ──────────────────────────────────────────</span>
+  <span class="kw">const</span> olangRes = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'https://api.olang.cloud/run'</span>, {
+    method: <span class="str">'POST'</span>,
+    headers: {
+      <span class="str">'Content-Type'</span>: <span class="str">'application/json'</span>,
+      <span class="str">'x-api-key'</span>:    process.env.<span class="key">OLANG_API_KEY</span>,
+    },
+    body: <span class="fn">JSON.stringify</span>({
+      <span class="key">workflow</span>: <span class="str">'customer-support-rag'</span>,
+      <span class="key">input</span>:    { <span class="key">query</span>: userText, <span class="key">userId</span>: from },
+    }),
+  });
+
+  <span class="kw">const</span> { reply } = <span class="kw">await</span> olangRes.<span class="fn">json</span>();
+
+  <span class="cm">// ── Send reply back via Meta Graph API ───────────────────</span>
+  <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">`https://graph.facebook.com/v21.0/<span class="key">${phoneNumberId}</span>/messages`</span>, {
+    method: <span class="str">'POST'</span>,
+    headers: {
+      <span class="str">'Authorization'</span>: <span class="str">`Bearer <span class="key">${process.env.META_ACCESS_TOKEN}</span>`</span>,
+      <span class="str">'Content-Type'</span>:  <span class="str">'application/json'</span>,
+    },
+    body: <span class="fn">JSON.stringify</span>({
+      <span class="key">messaging_product</span>: <span class="str">'whatsapp'</span>,
+      <span class="key">to</span>:               from,
+      <span class="key">type</span>:             <span class="str">'text'</span>,
+      <span class="key">text</span>:             { <span class="key">body</span>: reply.response },
+    }),
+  });
+});</div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /steps -->
+
+        <div class="callout tip">
+          <span class="callout-icon">🚀</span>
+          <div>
+            That's the complete integration — under 50 lines.
+            O-Lang handles the RAG, governance, PII masking, and audit trail.
+            You handle the WhatsApp channel. Full working example on
+            <a href="#">GitHub →</a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <!-- /whatsapp -->
+
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!-- TELEGRAM                                                  -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div id="telegram" class="channel-card">
+      <div class="channel-header">
+        <div class="channel-icon telegram-icon">✈️</div>
+        <div class="channel-meta">
+          <div class="channel-name">Telegram</div>
+          <div class="channel-tagline">Bot API · 900 million users · Completely free · No approval needed</div>
+        </div>
+        <div class="channel-badge badge-free badge-free-label">Completely Free</div>
+      </div>
+
+      <div class="channel-body">
+
+        <div class="callout info">
+          <span class="callout-icon">ℹ️</span>
+          <div>
+            Telegram's Bot API is <strong style="color:var(--green)">completely free</strong> with no conversation fees,
+            no approval process, and no business verification required.
+            You can have a bot running in under 5 minutes.
+            Ideal for internal tools, developer communities, and early testing.
+          </div>
+        </div>
+
+        <div class="steps">
+
+          <!-- Step 1 -->
+          <div class="step">
+            <div class="step-num">01</div>
+            <div class="step-content">
+              <div class="step-title">Create a bot with BotFather</div>
+              <div class="step-desc">
+                Open Telegram and search for <strong style="color:var(--teal)">@BotFather</strong>.
+                Send <code style="font-family:var(--font-code);color:var(--teal);font-size:12px">/newbot</code>,
+                choose a name and username (must end in <em>bot</em>).
+                BotFather returns your <strong style="color:var(--text)">Bot Token</strong> — save it.
+              </div>
+              <div class="code-wrap">
+                <div class="code-header"><span class="code-lang">BotFather reply</span></div>
+                <div class="code-body"><span class="cm">Done! Your bot token:</span>
+<span class="str">7412356789:AAF_xK9m2Lq4vR8nTp0wYbHcZs3JoEiDuGV</span>
+<span class="cm">Keep it secret. Use it to control your bot via the HTTP API.</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="step">
+            <div class="step-num">02</div>
+            <div class="step-content">
+              <div class="step-title">Add environment variables</div>
+              <table class="env-table">
+                <thead>
+                  <tr><th>Variable</th><th>Description</th><th>Where to find it</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="var-name">TELEGRAM_BOT_TOKEN</td>
+                    <td class="var-desc">Authenticates your bot with Telegram's API</td>
+                    <td class="var-src">BotFather → /newbot</td>
+                  </tr>
+                  <tr>
+                    <td class="var-name">TELEGRAM_WEBHOOK_SECRET</td>
+                    <td class="var-desc">Random string — verifies requests are from Telegram</td>
+                    <td class="var-src">You choose this</td>
+                  </tr>
+                  <tr>
+                    <td class="var-name">OLANG_API_KEY</td>
+                    <td class="var-desc">Your O-Lang cloud API key</td>
+                    <td class="var-src">olang.cloud → Dashboard</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="step">
+            <div class="step-num">03</div>
+            <div class="step-content">
+              <div class="step-title">Register your webhook with Telegram</div>
+              <div class="step-desc">
+                Run this once after deploying your server.
+                Telegram will POST every message to your URL from this point on.
+              </div>
+              <div class="code-wrap">
+                <div class="code-header">
+                  <span class="code-lang">Shell · one-time setup</span>
+                  <button class="copy-btn" onclick="copyCode(this, 'tg-setup')">copy</button>
+                </div>
+                <div class="code-body" id="tg-setup">curl -X POST \
+  https://api.telegram.org/bot<span class="key">${TELEGRAM_BOT_TOKEN}</span>/setWebhook \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{
+    "url": "https://your-server.com/webhook/telegram",
+    "secret_token": "'</span><span class="key">${TELEGRAM_WEBHOOK_SECRET}</span><span class="str">'"
+  }'</span>
+
+<span class="cm"># Expected response:</span>
+<span class="cm"># {"ok":true,"result":true,"description":"Webhook was set"}</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 4 -->
+          <div class="step">
+            <div class="step-num">04</div>
+            <div class="step-content">
+              <div class="step-title">Add the webhook handler to your server</div>
+
+              <div class="code-wrap">
+                <div class="code-header">
+                  <span class="code-lang">JavaScript · Node.js</span>
+                  <button class="copy-btn" onclick="copyCode(this, 'tg-code')">copy</button>
+                </div>
+                <div class="code-body" id="tg-code"><span class="cm">// ── Receive messages from Telegram ──────────────────────</span>
+app.<span class="fn">post</span>(<span class="str">'/webhook/telegram'</span>, <span class="kw">async</span> (req, res) => {
+  <span class="cm">// Verify request is genuinely from Telegram</span>
+  <span class="kw">const</span> secret = req.headers[<span class="str">'x-telegram-bot-api-secret-token'</span>];
+  <span class="kw">if</span> (secret !== process.env.<span class="key">TELEGRAM_WEBHOOK_SECRET</span>) {
+    <span class="kw">return</span> res.<span class="fn">sendStatus</span>(<span class="num">403</span>);
+  }
+
+  res.<span class="fn">sendStatus</span>(<span class="num">200</span>); <span class="cm">// respond immediately</span>
+
+  <span class="kw">const</span> msg = req.body?.message;
+  <span class="kw">if</span> (!msg?.text) <span class="kw">return</span>; <span class="cm">// ignore non-text (photos, stickers, etc.)</span>
+
+  <span class="kw">const</span> chatId   = msg.chat.id;
+  <span class="kw">const</span> userId   = String(msg.from.id);
+  <span class="kw">const</span> userText = msg.text;
+
+  <span class="cm">// ── Call O-Lang ──────────────────────────────────────────</span>
+  <span class="kw">const</span> olangRes = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">'https://api.olang.cloud/run'</span>, {
+    method: <span class="str">'POST'</span>,
+    headers: {
+      <span class="str">'Content-Type'</span>: <span class="str">'application/json'</span>,
+      <span class="str">'x-api-key'</span>:    process.env.<span class="key">OLANG_API_KEY</span>,
+    },
+    body: <span class="fn">JSON.stringify</span>({
+      <span class="key">workflow</span>: <span class="str">'customer-support-rag'</span>,
+      <span class="key">input</span>:    { <span class="key">query</span>: userText, <span class="key">userId</span> },
+    }),
+  });
+
+  <span class="kw">const</span> { reply } = <span class="kw">await</span> olangRes.<span class="fn">json</span>();
+
+  <span class="cm">// ── Send reply back via Telegram Bot API ─────────────────</span>
+  <span class="kw">await</span> <span class="fn">fetch</span>(
+    <span class="str">`https://api.telegram.org/bot<span class="key">${process.env.TELEGRAM_BOT_TOKEN}</span>/sendMessage`</span>,
+    {
+      method: <span class="str">'POST'</span>,
+      headers: { <span class="str">'Content-Type'</span>: <span class="str">'application/json'</span> },
+      body: <span class="fn">JSON.stringify</span>({
+        <span class="key">chat_id</span>:    chatId,
+        <span class="key">text</span>:       reply.response,
+        <span class="key">parse_mode</span>: <span class="str">'Markdown'</span>, <span class="cm">// O-Lang returns clean markdown</span>
+      }),
+    }
+  );
+});</div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /steps -->
+
+        <div class="callout tip">
+          <span class="callout-icon">🚀</span>
+          <div>
+            Telegram is the fastest channel to test with — no approval, no fees, live in minutes.
+            Use it to validate your O-Lang workflow before deploying to WhatsApp.
+            Full working example on <a href="#">GitHub →</a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <!-- /telegram -->
+
+    <!-- Footer -->
+    <footer class="doc-footer">
+      <span>O-Lang Platform Documentation</span>
+      <div class="footer-links">
+        <a href="#">GitHub</a>
+        <a href="#">Resolver Registry</a>
+        <a href="#">olang.cloud</a>
+        <a href="#">Support</a>
+      </div>
+    </footer>
+
+  </main>
+</div>
+
+<script>
+function copyCode(btn, id) {
+  const el = document.getElementById(id);
+  // Strip HTML tags to get plain text
+  const text = el.innerText || el.textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'copy';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+
+// Active nav highlight on scroll
+const sections = document.querySelectorAll('[id]');
+const navItems = document.querySelectorAll('.nav-item');
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      navItems.forEach(item => {
+        item.classList.toggle(
+          'active',
+          item.getAttribute('href') === '#' + entry.target.id
+        );
+      });
+    }
+  });
+}, { threshold: 0.3 });
+
+sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>

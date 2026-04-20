@@ -44,7 +44,7 @@ export function ApplicationsSection() {
             </div>
             
             <Link 
-              href="/playground" 
+              href="/playground?domain=finance"
               className="inline-flex items-center gap-2 text-[15px] font-semibold text-blue-400 hover:text-blue-300 transition-colors"
             >
               Try the Finance Chatbot →
@@ -72,7 +72,7 @@ export function ApplicationsSection() {
             </div>
             
             <Link 
-              href="/docs/healthcare" 
+              href="/playground?domain=healthcare"
               className="inline-flex items-center gap-2 text-[15px] font-semibold text-emerald-400 hover:text-emerald-300 transition-colors"
             >
               See Healthcare Workflows →
@@ -100,7 +100,7 @@ export function ApplicationsSection() {
             </div>
             
             <Link 
-              href="/docs/government" 
+              href="/playground?domain=government" 
               className="inline-flex items-center gap-2 text-[15px] font-semibold text-violet-400 hover:text-violet-300 transition-colors"
             >
               Explore Government Patterns →
