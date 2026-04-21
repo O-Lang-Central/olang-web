@@ -428,7 +428,7 @@ function InlineText({ text }: { text: string }) {
   );
 }
 
-// Risk badge component (used by LegalResponseView)
+// Risk badge component (used by LegalResponseView) function
 function RiskBadge({ text }: { text: string }) {
   const high = /\[HIGH\]/i.test(text);
   const medium = /\[MEDIUM\]/i.test(text);
