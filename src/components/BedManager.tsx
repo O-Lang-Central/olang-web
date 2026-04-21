@@ -199,25 +199,25 @@ export function BedManagerPanel({
             Team Permissions
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {[...new Set(teamScope.map(t => t.team))].map(team => {
-              const wards = teamScope.filter(t => t.team === team).map(t => t.ward);
+           {[...new Set((teamScope ?? []).map(t => t.team))].map(team => {
+            const teamWards = (teamScope ?? []).filter(t => t.team === team).map(t => t.ward);
               return (
                 <div key={team} style={{ background: "#ffffff06", border: `1px solid ${BORDER}`, borderRadius: 7, padding: "6px 10px" }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: TEXT2, marginBottom: 4 }}>{team}</div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
-                    {wards.map(ward => (
-                      <span key={ward} style={{
-                        fontSize: 9,
-                        padding: "2px 6px",
-                        borderRadius: 4,
-                        background: "#10b98115",
-                        border: "1px solid #10b98130",
-                        color: OK,
-                        fontFamily: "monospace",
-                      }}>
-                        {ward}
-                      </span>
-                    ))}
+                   {teamWards.map(ward => (
+  <span key={ward} style={{
+    fontSize: 9,
+    padding: "2px 6px",
+    borderRadius: 4,
+    background: "#10b98115",
+    border: "1px solid #10b98130",
+    color: OK,
+    fontFamily: "monospace",
+  }}>
+    {ward}
+  </span>
+))}
                   </div>
                 </div>
               );
