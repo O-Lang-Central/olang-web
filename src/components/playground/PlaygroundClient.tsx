@@ -11,10 +11,12 @@ import { useBeds, BedManagerPanel, BedManagerTab } from "@/components/BedManager
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
 type TabId   = "trace" | "safety" | "audit" | "intent" | "customer" | "beds";
+// Internal domain types remain strict
 type Domain  = "finance" | "health" | "legal";
 
 const KERNEL_URL = process.env.NEXT_PUBLIC_KERNEL_URL ?? "http://localhost:3001";
 
+// ── TEMPLATES (Keys must match Internal Domain Type) ──────────────────────────
 const OL_TEMPLATES: Record<Domain, string> = {
   finance: `Workflow "Bank Balance Check" with user_question, customer_id, bank_db_path
 
@@ -47,7 +49,6 @@ Save as response
 
 Return response`,
 
-  // ✅ SIMPLIFIED: Legal domain now only does summarization (linear, no conditionals)
   legal: `Workflow "Legal Document Review" with document_ref, jurisdiction, doc_type, document_text
 
 Allow resolvers:
@@ -86,7 +87,23 @@ Save as response
 Return response`,
 };
 
-// ── Syntax validation ─────────────────────────────────────────────────────────
+// ── FIX #1: NORMALIZATION LAYER ───────────────────────────────────────────────
+function domainFromParam(param: string | null): Domain {
+  switch (param?.toLowerCase()) {
+    case "healthcare":
+    case "health":
+      return "health";
+    case "finance":
+      return "finance";
+    case "legal":
+    case "government": // Map government to legal if desired, or default
+      return "legal";
+    default:
+      return "finance"; // Safe fallback
+  }
+}
+
+// ── SYNTAX VALIDATION (Unchanged) ─────────────────────────────────────────────
 interface SyntaxError {
   line:       number;
   col:        number;
@@ -105,7 +122,6 @@ function validateOLang(code: string): SyntaxError[] {
   let stepCount                 = 0;
   const saveAliases: string[]  = [];
 
-  // ✅ Known resolvers (sync with your kernel's CHAIN)
   const KNOWN_RESOLVERS = new Set([
     "legal-extractor", "llm-groq", "llm-openai",
     "bank-account-lookup", "icu-admission", "pii-validator"
@@ -132,7 +148,6 @@ function validateOLang(code: string): SyntaxError[] {
 
     if (/^Allow resolvers:/i.test(t)) { hasAllow = true; return; }
 
-    // ── Allowlist resolver validation (accepts prefixed OR unprefixed) ───
     if (/^-\s+/.test(t)) {
       const rawName = t.substring(2).trim();
       const cleanName = rawName.replace(/^@o-lang\//i, '');
@@ -142,7 +157,6 @@ function validateOLang(code: string): SyntaxError[] {
           message: "Resolver listed outside an 'Allow resolvers:' block.",
           suggestion: "Add 'Allow resolvers:' on the line above your resolver list." });
       } else if (!KNOWN_RESOLVERS.has(cleanName)) {
-        // ⚠️ Only warn on truly unknown resolvers
         errors.push({
           line: lineNum,
           col: 1,
@@ -152,17 +166,14 @@ function validateOLang(code: string): SyntaxError[] {
           suggestion: `- ${cleanName}`
         });
       }
-      // ✅ Known resolver (prefixed or not): silent success
       return;
     }
 
-    // ── Reserved keyword check inside quoted prompts ─────────────────────
     if (/^Step\s+\d+:/i.test(t) || /^Ask\s+/i.test(t)) {
       const quotedStrings = t.match(/"([^"]*)"/g);
       if (quotedStrings) {
         for (const quote of quotedStrings) {
           const inner = quote.slice(1, -1);
-          // Warn if "Return" is used as an imperative verb inside a prompt string
           if (/\bReturn\s+(ONLY|the|your|output|result|report|response)/i.test(inner)) {
             errors.push({
               line: lineNum,
@@ -320,16 +331,7 @@ const ACCENTS: Record<Domain, string> = {
   legal:   "#8b5cf6",
 };
 
-function domainFromParam(param: string | null): Domain {
-  if (param === "healthcare") return "health";
-  if (param === "health")     return "health";
-  if (param === "finance")    return "finance";
-  if (param === "legal")      return "legal";
-  if (param === "government") return "legal";
-  return "finance";
-}
-
-// ── Design tokens (shared) ────────────────────────────────────────────────────
+// ── DESIGN TOKENS ─────────────────────────────────────────────────────────────
 const BG      = "#070d1a";
 const PANEL   = "#0c1425";
 const BORDER  = "#1a2840";
@@ -341,429 +343,27 @@ const ERR     = "#f87171";
 const WARN    = "#fbbf24";
 const OK      = "#34d399";
 
-// ── SHARED HELPERS (used by all domain views) ────────────────────────────────
-
-// Unwrap double-encoded LLM response (handles up to 3 layers of JSON encoding)
-function unwrapLegalResponse(raw: string): string {
-  if (!raw) return '';
-  let text = raw.trim();
-  for (let i = 0; i < 3; i++) {
-    if (!text.startsWith('{') && !text.startsWith('"')) break;
-    try {
-      const parsed = JSON.parse(text);
-      if (typeof parsed === 'string') { text = parsed; continue; }
-      if (parsed?.response)  { text = parsed.response;  continue; }
-      if (parsed?.reply)     { text = parsed.reply;     continue; }
-      if (parsed?.content)   { text = parsed.content;   continue; }
-      break;
-    } catch { break; }
-  }
-  return text.trim();
-}
-
-// Markdown-to-React block parser (used by LegalResponseView)
-type Block =
-  | { kind: 'h2'; text: string }
-  | { kind: 'h3'; text: string }
-  | { kind: 'p';  text: string }
-  | { kind: 'ul'; items: string[] }
-  | { kind: 'ol'; items: string[] }
-  | { kind: 'risk'; items: string[] }
-  | { kind: 'divider' };
-
-function parseMd(text: string): Block[] {
-  const lines = text.split('\n');
-  const blocks: Block[] = [];
-  let listBuf: string[] = [];
-  let listKind: 'ul' | 'ol' = 'ul';
-  let isRiskList = false;
-
-  const flushList = () => {
-    if (!listBuf.length) return;
-    blocks.push(isRiskList ? { kind: 'risk', items: [...listBuf] } : { kind: listKind, items: [...listBuf] });
-    listBuf = []; isRiskList = false;
-  };
-  const isRiskLine = (s: string) => /\[(HIGH|MEDIUM|LOW)\]/i.test(s);
-
-  for (const raw of lines) {
-    const line = raw.trimEnd();
-    if (!line.trim()) { flushList(); continue; }
-    if (/^## /.test(line)) { flushList(); blocks.push({ kind: 'h2', text: line.replace(/^## /, '').trim() }); continue; }
-    if (/^### /.test(line)) { flushList(); blocks.push({ kind: 'h3', text: line.replace(/^### /, '').trim() }); continue; }
-    if (/^[A-Z][A-Z\s&\/]{3,}:?$/.test(line.trim())) { flushList(); blocks.push({ kind: 'h3', text: line.trim().replace(/:$/, '') }); continue; }
-    if (/^[-*•] /.test(line.trim())) {
-      const content = line.trim().replace(/^[-*•] /, '');
-      if (listBuf.length && listKind !== 'ul') flushList();
-      listKind = 'ul';
-      if (isRiskLine(content)) isRiskList = true;
-      listBuf.push(content);
-      continue;
-    }
-    if (/^\d+\. /.test(line.trim())) {
-      const content = line.trim().replace(/^\d+\. /, '');
-      if (listBuf.length && listKind !== 'ol') flushList();
-      listKind = 'ol';
-      listBuf.push(content);
-      continue;
-    }
-    flushList();
-    const t = line.trim();
-    if (t) blocks.push({ kind: 'p', text: t });
-  }
-  flushList();
-  return blocks;
-}
-
-// Inline bold renderer: **text** → <strong>text</strong>
-function InlineText({ text }: { text: string }) {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
-  return (
-    <>
-      {parts.map((p, i) =>
-        p.startsWith('**') && p.endsWith('**')
-          ? <strong key={i} style={{ fontWeight: 600, color: 'inherit' }}>{p.slice(2, -2)}</strong>
-          : <span key={i}>{p}</span>
-      )}
-    </>
-  );
-}
-
-// Risk badge component (used by LegalResponseView) function
-function RiskBadge({ text }: { text: string }) {
-  const high = /\[HIGH\]/i.test(text);
-  const medium = /\[MEDIUM\]/i.test(text);
-  const clean = text.replace(/\[(HIGH|MEDIUM|LOW)\]\s*/i, '').trim();
-  const [bg, border, labelColor, label] = high
-    ? ['#2d0a0a', '#7f1d1d', '#f87171', 'HIGH']
-    : medium ? ['#2a1a00', '#78350f', '#fbbf24', 'MEDIUM']
-    : ['#0a1628', '#1e3a5f', '#64748b', 'LOW'];
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 12px', marginBottom: 5, background: bg, border: `1px solid ${border}`, borderRadius: 8 }}>
-      <span style={{ fontFamily: 'monospace', fontSize: 10, fontWeight: 700, color: labelColor, border: `1px solid ${border}`, padding: '2px 6px', borderRadius: 4, flexShrink: 0, marginTop: 1, letterSpacing: '0.05em' }}>{label}</span>
-      <span style={{ fontSize: 13, color: '#cbd5e1', lineHeight: 1.5 }}>{clean}</span>
-    </div>
-  );
-}
-
-// Section card wrapper (used by LegalResponseView)
-function Section({ label, accent, children }: { label?: string; accent?: string; children: React.ReactNode }) {
-  return (
-    <div style={{ background: '#08111e', border: '1px solid #1a2840', borderRadius: 10, overflow: 'hidden', marginBottom: 12 }}>
-      {label && (
-        <div style={{ padding: '8px 14px', borderBottom: '1px solid #1a2840', background: '#060c18' }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: accent ?? '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</span>
-        </div>
-      )}
-      <div style={{ padding: '12px 14px' }}>{children}</div>
-    </div>
-  );
-}
-
-// ── FORMATTED RESPONSE RENDERERS PER DOMAIN ─────────────────────────────────
-
-// Legal: Full markdown parser + section grouping + risk badges
-function LegalResponseView({ response }: { response: string }) {
-  const text = unwrapLegalResponse(response);
-  const blocks = parseMd(text);
-
-  // Group consecutive blocks under the most recent h2/h3 heading
-  type Group = { heading: string | null; accent: string | null; blocks: Block[] };
-  const groups: Group[] = [];
-  let cur: Group = { heading: null, accent: null, blocks: [] };
-
-  const SECTION_ACCENTS: Record<string, string> = {
-    'parties': '#60a5fa', 'party': '#60a5fa',
-    'clause': '#a78bfa',
-    'date': '#34d399', 'deadline': '#34d399',
-    'obligation': '#fb923c',
-    'risk': '#f87171', 'flag': '#f87171',
-    'summary': '#94a3b8', 'document': '#94a3b8', 'overview': '#94a3b8',
-    'type': '#94a3b8', 'jurisdiction': '#94a3b8',
-  };
-
-  const accentForHeading = (h: string) => {
-    const lc = h.toLowerCase();
-    for (const [key, color] of Object.entries(SECTION_ACCENTS)) {
-      if (lc.includes(key)) return color;
-    }
-    return '#8b5cf6';
-  };
-
-  for (const block of blocks) {
-    if (block.kind === 'h2' || block.kind === 'h3') {
-      if (cur.blocks.length || cur.heading) groups.push(cur);
-      cur = { heading: block.text, accent: accentForHeading(block.text), blocks: [] };
-    } else {
-      cur.blocks.push(block);
-    }
-  }
-  if (cur.blocks.length || cur.heading) groups.push(cur);
-
-  // Render a single block
-  const renderBlock = (block: Block, i: number) => {
-    switch (block.kind) {
-      case 'p':
-        return (
-          <p key={i} style={{ margin: '0 0 10px', fontSize: 13, color: '#cbd5e1', lineHeight: 1.7 }}>
-            <InlineText text={block.text} />
-          </p>
-        );
-      case 'ul':
-        return (
-          <ul key={i} style={{ margin: '0 0 10px', padding: 0, listStyle: 'none' }}>
-            {block.items.map((item, j) => (
-              <li key={j} style={{ display: 'flex', gap: 10, marginBottom: 6, fontSize: 13, color: '#cbd5e1', lineHeight: 1.55 }}>
-                <span style={{ color: '#8b5cf6', flexShrink: 0, marginTop: 2, fontSize: 10 }}>▸</span>
-                <span><InlineText text={item} /></span>
-              </li>
-            ))}
-          </ul>
-        );
-      case 'ol':
-        return (
-          <ol key={i} style={{ margin: '0 0 10px', padding: 0, listStyle: 'none' }}>
-            {block.items.map((item, j) => (
-              <li key={j} style={{ display: 'flex', gap: 10, marginBottom: 6, fontSize: 13, color: '#cbd5e1', lineHeight: 1.55 }}>
-                <span style={{ color: '#8b5cf6', flexShrink: 0, fontWeight: 700, fontSize: 11, marginTop: 2, minWidth: 16 }}>{j + 1}.</span>
-                <span><InlineText text={item} /></span>
-              </li>
-            ))}
-          </ol>
-        );
-      case 'risk':
-        return (
-          <div key={i} style={{ marginBottom: 4 }}>
-            {block.items.map((item, j) => <RiskBadge key={j} text={item} />)}
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-
-  // If no structure parsed, render as plain text
-  if (!groups.length) {
-    return (
-      <p style={{ margin: 0, fontSize: 13, color: '#cbd5e1', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
-        {text}
-      </p>
-    );
-  }
-
-  return (
-    <div>
-      {groups.map((group, gi) => {
-        if (!group.heading) {
-          return (
-            <div key={gi} style={{ marginBottom: 12 }}>
-              {group.blocks.map((b, bi) => renderBlock(b, bi))}
-            </div>
-          );
-        }
-        return (
-          <Section key={gi} label={group.heading} accent={group.accent ?? '#8b5cf6'}>
-            {group.blocks.map((b, bi) => renderBlock(b, bi))}
-          </Section>
-        );
-      })}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', marginTop: 4, background: '#060d1a', border: '1px solid #1a2840', borderRadius: 8 }}>
-        <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-          <path d="M7 1L2 3.5v4C2 10.5 4.5 13 7 14c2.5-1 5-3.5 5-6.5v-4L7 1z" stroke="#8b5cf6" strokeWidth="1.2" fill="none"/>
-        </svg>
-        <span style={{ fontSize: 11, color: '#475569' }}>Extract-only · No legal advice provided · Consult a qualified legal professional</span>
-      </div>
-    </div>
-  );
-}
-
-// Finance: Simple view with balance card + clean text
-function FinanceResponseView({ response }: { response: string }) {
-  const cleanText = unwrapLegalResponse(response);
-  const balanceMatch = cleanText.match(/\$[\d,]+\.?\d{0,2}|NGN\s?[\d,]+|₦[\d,]+/);
-  const balance = balanceMatch ? balanceMatch[0] : null;
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {balance && (
-        <div style={{ background: '#0a1628', border: '1px solid #3b82f640', borderRadius: 10, padding: '16px 20px' }}>
-          <div style={{ fontSize: 11, color: TEXT3, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 6 }}>Account balance</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: OK, fontFamily: 'monospace', letterSpacing: '-0.5px' }}>{balance}</div>
-        </div>
-      )}
-      <div style={{ background: '#08111e', border: `1px solid ${BORDER2}`, borderRadius: 10, padding: '14px 16px' }}>
-        <p style={{ margin: 0, fontSize: 14, color: TEXT, lineHeight: 1.7 }}>
-          <InlineText text={cleanText} />
-        </p>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#0a1628', border: `1px solid ${BORDER}`, borderRadius: 8 }}>
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <rect x="1" y="1" width="12" height="12" rx="3" stroke="#3b82f6" strokeWidth="1.2"/>
-          <path d="M4 7h6M4 9.5h4" stroke="#3b82f6" strokeWidth="1.2" strokeLinecap="round"/>
-        </svg>
-        <span style={{ fontSize: 11, color: TEXT3 }}>Secure · Kernel verified · No transfer capabilities exposed</span>
-      </div>
-    </div>
-  );
-}
-
-// Health: Simple view with status badge + clinical summary
-function HealthResponseView({ response }: { response: string }) {
-  const cleanText = unwrapLegalResponse(response);
-  const statusMatch = cleanText.match(/\b(admitted|approved|pending|rejected|scheduled|confirmed)\b/i);
-  const status = statusMatch ? statusMatch[1].toLowerCase() : null;
-  const statusColor = status === 'admitted' || status === 'approved' || status === 'confirmed' ? OK : status === 'pending' || status === 'scheduled' ? WARN : TEXT3;
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {status && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#08111e', border: `1px solid ${BORDER2}`, borderRadius: 10, padding: '12px 16px' }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: statusColor, flexShrink: 0 }} />
-          <span style={{ fontSize: 11, color: TEXT3, textTransform: 'uppercase', letterSpacing: '0.8px' }}>Admission status</span>
-          <span style={{ fontSize: 13, fontWeight: 700, color: statusColor, marginLeft: 'auto', textTransform: 'capitalize' }}>{status}</span>
-        </div>
-      )}
-      <div style={{ background: '#08111e', border: `1px solid ${BORDER2}`, borderRadius: 10, padding: '14px 16px' }}>
-        <p style={{ margin: 0, fontSize: 14, color: TEXT, lineHeight: 1.7 }}>
-          <InlineText text={cleanText} />
-        </p>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#0a1628', border: `1px solid ${BORDER}`, borderRadius: 8 }}>
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path d="M7 1L2 3.5v4C2 10.5 4.5 13 7 14c2.5-1 5-3.5 5-6.5v-4L7 1z" stroke="#10b981" strokeWidth="1.2" fill="none"/>
-        </svg>
-        <span style={{ fontSize: 11, color: TEXT3 }}>Scope-enforced · Team-restricted · Clinical governance active</span>
-      </div>
-    </div>
-  );
-}
-
-// ── Blocked response view ─────────────────────────────────────────────────────
-function BlockedView({ domain, violation, accent }: { domain: Domain; violation?: { action?: string }; accent: string }) {
-  const messages: Record<string, string> = {
-    account_transfer: "For security, transfers cannot be initiated through this channel. Please use your banking app, visit a branch, or call support.",
-    balance_modification: "This service is for balance enquiries only. To deposit or withdraw, please use the banking app or visit your nearest branch.",
-    speculative_balance: "I can only show your current account balance. For projections or financial planning, please speak with one of our advisors.",
-  };
-  const msg = violation?.action ? (messages[violation.action] ?? "We're unable to process this request. Please try a different query or contact support.") : "We're unable to process this request. Please try a different query or contact support.";
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#ef444415", border: "1px solid #ef444435", borderRadius: 10, padding: "12px 16px" }}>
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <circle cx="8" cy="8" r="7" stroke={ERR} strokeWidth="1.3"/>
-          <path d="M8 4.5v4M8 11v.5" stroke={ERR} strokeWidth="1.5" strokeLinecap="round"/>
-        </svg>
-        <span style={{ fontSize: 12, fontWeight: 700, color: ERR }}>Request blocked by governance policy</span>
-      </div>
-      <div style={{ background: "#08111e", border: `1px solid ${BORDER2}`, borderRadius: 10, padding: "14px 16px" }}>
-        <p style={{ margin: 0, fontSize: 14, color: TEXT, lineHeight: 1.7 }}>{msg}</p>
-      </div>
-      <div style={{ fontSize: 11, color: TEXT3, padding: "6px 4px" }}>See Safety Logs tab for the full governance trace.</div>
-    </div>
-  );
-}
-
-// ── Customer View wrapper ─────────────────────────────────────────────────────
-function CustomerView({ domain, result, error, accent }: { domain: Domain; result: ExecutionResult | null; error: string | null; accent: string }) {
-  const domainLabel = domain === "finance" ? "Digital Banking Assistant" : domain === "health" ? "Clinical Support" : "Legal Document Summarizer";
-
-  const domainIcon = domain === "finance" ? (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <rect x="1" y="4" width="14" height="10" rx="2" stroke="white" strokeWidth="1.3"/>
-      <path d="M1 7h14" stroke="white" strokeWidth="1.3"/>
-      <path d="M4 10.5h2M4 12h4" stroke="white" strokeWidth="1.2" strokeLinecap="round"/>
-    </svg>
-  ) : domain === "health" ? (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <rect x="5" y="1" width="6" height="14" rx="1.5" stroke="white" strokeWidth="1.3"/>
-      <rect x="1" y="5" width="14" height="6" rx="1.5" stroke="white" strokeWidth="1.3"/>
-    </svg>
-  ) : (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <path d="M8 1L2 3.5v4C2 10.5 4.5 13 7.5 14.5 10.5 13 13 10.5 13 7.5v-4L8 1z" stroke="white" strokeWidth="1.3" fill="none"/>
-    </svg>
-  );
-
-  if (!result && !error) {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 16px", gap: 16, textAlign: "center" }}>
-        <div style={{ width: 56, height: 56, borderRadius: 16, background: accent + "15", border: `1px solid ${accent}25`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth="1.5" style={{ width: 28, height: 28 }}><path d="M5 3l14 9-14 9V3z"/></svg>
-        </div>
-        <div>
-          <p style={{ fontSize: 14, fontWeight: 600, color: TEXT, margin: "0 0 4px" }}>Run a workflow to see results</p>
-          <p style={{ fontSize: 13, color: TEXT2, margin: 0 }}>The user-facing output will appear here</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* Channel header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <div style={{ width: 36, height: 36, borderRadius: "50%", background: accent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{domainIcon}</div>
-        <div>
-          <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: TEXT }}>{domainLabel}</p>
-          <p style={{ margin: 0, fontSize: 11, color: TEXT3 }}>Powered by O-Lang · Governed response</p>
-        </div>
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, background: result?.ok ? "#10b98115" : "#ef444415", border: `1px solid ${result?.ok ? "#10b98130" : "#ef444430"}`, borderRadius: 20, padding: "4px 10px" }}>
-          <div style={{ width: 6, height: 6, borderRadius: "50%", background: result?.ok ? OK : ERR }} />
-          <span style={{ fontSize: 10, fontWeight: 700, color: result?.ok ? OK : ERR }}>{result?.ok ? "VERIFIED" : "BLOCKED"}</span>
-        </div>
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div style={{ background: "#ef444415", border: "1px solid #ef444430", borderRadius: 10, padding: "14px 16px" }}>
-          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: ERR, marginBottom: 4 }}>Something went wrong</p>
-          <p style={{ margin: 0, fontSize: 13, color: TEXT2 }}>Please try again or check the kernel connection.</p>
-        </div>
-      )}
-
-      {/* Success response — domain-specific rendering */}
-      {result?.ok && result.response && (
-        domain === "legal" ? <LegalResponseView response={result.response} /> :
-        domain === "finance" ? <FinanceResponseView response={result.response} /> :
-        <HealthResponseView response={result.response} />
-      )}
-
-      {/* Blocked response */}
-      {result && !result.ok && <BlockedView domain={domain} violation={result.violation} accent={accent} />}
-
-      {/* Governance footer */}
-      {result && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", background: "#060d1a", border: `1px solid ${BORDER}`, borderRadius: 8 }}>
-          <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-            <path d="M7 1L2 3.5v4C2 10.5 4.5 13 7 14c2.5-1 5-3.5 5-6.5v-4L7 1z" stroke={result.ok ? OK : TEXT3} strokeWidth="1.2" fill="none"/>
-          </svg>
-          <span style={{ fontSize: 11, color: TEXT3, flex: 1 }}>
-            {result.ok ? "Response verified by O-Lang kernel · No policy violations" : "Request reviewed by O-Lang kernel · See Safety Logs for details"}
-          </span>
-          <span style={{ fontFamily: "monospace", fontSize: 10, color: TEXT3 }}>{result.audit?.execution_hash?.slice(0, 12) ?? ""}…</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Component ─────────────────────────────────────────────────────────────────
+// ── COMPONENT ─────────────────────────────────────────────────────────────────
 export function PlaygroundClient() {
   const searchParams = useSearchParams();
+  
+  // ✅ FIX #1: Normalize URL param to internal Domain type
   const initialDomain = domainFromParam(searchParams.get("domain"));
+  
   const bedState = useBeds();
+  
   const [domain, setDomain] = useState<Domain>(initialDomain);
   const [code, setCode] = useState(OL_TEMPLATES[initialDomain]);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<ExecutionResult | null>(null);
+  
+  // ✅ FIX #2: Initialize tab, but allow reset via effect
   const [tab, setTab] = useState<TabId>("customer");
+  
   const [inputVals, setInputVals] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [syntaxErrors, setSyntaxErrors] = useState<SyntaxError[]>([]);
   const [activeError, setActiveError] = useState<SyntaxError | null>(null);
-  
-  // ✅ NEW: Track if user has edited the code (local-first execution model)
   const [isDirty, setIsDirty] = useState(false);
 
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
@@ -772,23 +372,24 @@ export function PlaygroundClient() {
   const cfg = DOMAIN_CONFIGS[domain];
   const accent = ACCENTS[domain];
 
-  // ✅ Detect when user's code diverges from the default template
+  // ✅ FIX #3: Reset State when Domain Changes
   useEffect(() => {
-    setIsDirty(code.trim() !== OL_TEMPLATES[domain].trim());
-  }, [code, domain]);
-
-  // ✅ Reset to template on domain switch AND clear dirty state
-  const switchDomain = useCallback((d: Domain) => {
-    setDomain(d);
-    setCode(OL_TEMPLATES[d]);
+    setCode(OL_TEMPLATES[domain]);
     setResult(null);
     setInputVals({});
     setError(null);
     setSyntaxErrors([]);
     setActiveError(null);
-    setIsDirty(false); // ← Clear dirty state on domain switch
-  }, []);
+    setIsDirty(false);
+    setTab("customer"); // Reset tab to default view
+  }, [domain]);
 
+  // Detect dirty state
+  useEffect(() => {
+    setIsDirty(code.trim() !== OL_TEMPLATES[domain].trim());
+  }, [code, domain]);
+
+  // Validation Effect
   useEffect(() => {
     const errs = validateOLang(code);
     setSyntaxErrors(errs);
@@ -814,7 +415,6 @@ export function PlaygroundClient() {
     });
   }, [syntaxErrors]);
 
-  // ✅ REPLACED: handleRun with local-first execution logic
   const handleRun = useCallback(async () => {
     const hardErrors = syntaxErrors.filter(e => e.severity === 'error');
     if (hardErrors.length) {
@@ -831,48 +431,25 @@ export function PlaygroundClient() {
     setError(null);
     const t0 = Date.now();
 
-    // Build payload
     const payload: Record<string, unknown> = {};
     Object.entries(inputVals).forEach(([key, value]) => {
       if (typeof value === 'string') { const t = value.trim(); if (t) payload[key] = t; }
       else if (value !== undefined && value !== null) payload[key] = value;
     });
     if (domain === 'finance') payload.bank_db_path = payload.bank_db_path || './bank.db';
-
-    // Add defaults for legal domain (simplified: only summarization)
     if (domain === "legal") {
-      payload.task_instructions = payload.task_instructions ?? 
-        "Provide a plain-English summary under 150 words.";
+      payload.task_instructions = payload.task_instructions ?? "Provide a plain-English summary under 150 words.";
     }
-
-   // 🔍 DEBUG: Log exactly what's being sent to kernel
-console.log('=== [RUN] Debug Payload ===');
-console.log('domain:', domain);
-console.log('isDirty:', isDirty);
-console.log('code.startsWith("Workflow"):', code.trim().startsWith('Workflow'));
-console.log('code first 120 chars:', JSON.stringify(code.slice(0, 120)));
-console.log('payload keys:', Object.keys(payload));
-if (isDirty) {
-  console.log('workflow_string preview:', JSON.stringify(code.slice(0, 120)));
-}
-console.log('=== [RUN] End Debug ===');
 
     try {
       let res: Response;
-
       if (isDirty) {
-        // ── Local edit: send workflow string to /run-inline ────────────────
         res = await fetch(`${KERNEL_URL}/run-inline`, {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({
-            workflow_string: code,
-            inputs:          payload,
-            domain,
-          }),
+          body:    JSON.stringify({ workflow_string: code, inputs: payload, domain }),
         });
       } else {
-        // ── Default: use the persisted domain endpoint ─────────────────────
         res = await fetch(`${KERNEL_URL}${cfg.endpoint}`, {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -884,9 +461,7 @@ console.log('=== [RUN] End Debug ===');
       const data = await res.json();
       const ok   = res.ok && data.ok !== false;
       const now  = new Date().toISOString();
-      const isSafetyHalt = data.error_code === 'safety_halt' ||
-                           data.error?.includes('[O-Lang SAFETY]');
-
+      const isSafetyHalt = data.error_code === 'safety_halt' || data.error?.includes('[O-Lang SAFETY]');
       const execHash = data.audit?.execution_hash ?? fakeHash(JSON.stringify(payload) + now);
 
       const safetyEvents = isSafetyHalt ? [
@@ -946,19 +521,19 @@ console.log('=== [RUN] End Debug ===');
     } finally {
       setRunning(false);
     }
-  }, [code, domain, inputVals, cfg, syntaxErrors, isDirty]);
+  }, [code, domain, inputVals, cfg, syntaxErrors, isDirty, bedState]);
 
   const errCount = syntaxErrors.filter((e) => e.severity === "error").length;
   const warnCount = syntaxErrors.filter((e) => e.severity === "warning").length;
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: "customer", label: "Result" },
-  { id: "trace",    label: "Execution Trace" },
-  { id: "safety",   label: "Safety Logs" },
-  { id: "audit",    label: "Audit Trail" },
-  { id: "intent",   label: "Verified Intent" },
-  ...(domain === "health" ? [{ id: "beds" as TabId, label: "Beds" }] : []),
-];
+  const TABS: { id: TabId; label: string }[] = [
+    { id: "customer", label: "Result" },
+    { id: "trace",    label: "Execution Trace" },
+    { id: "safety",   label: "Safety Logs" },
+    { id: "audit",    label: "Audit Trail" },
+    { id: "intent",   label: "Verified Intent" },
+    ...(domain === "health" ? [{ id: "beds" as TabId, label: "Beds" }] : []),
+  ];
 
   return (
     <div className="min-h-screen flex flex-col pt-16" style={{ background: BG }}>
@@ -970,7 +545,14 @@ const TABS: { id: TabId; label: string }[] = [
         </div>
         <div className="flex gap-1 ml-4 p-1 rounded-xl" style={{ background: "#060d1a" }}>
           {(["finance", "health", "legal"] as const).map((d) => (
-            <button key={d} onClick={() => switchDomain(d)} className="px-4 py-1.5 rounded-lg text-sm font-semibold capitalize transition-all" style={domain === d ? { background: ACCENTS[d], color: "#fff", boxShadow: `0 2px 8px ${ACCENTS[d]}50` } : { color: TEXT3, background: "transparent" }}>{d}</button>
+            <button 
+              key={d} 
+              onClick={() => setDomain(d)} 
+              className="px-4 py-1.5 rounded-lg text-sm font-semibold capitalize transition-all" 
+              style={domain === d ? { background: ACCENTS[d], color: "#fff", boxShadow: `0 2px 8px ${ACCENTS[d]}50` } : { color: TEXT3, background: "transparent" }}
+            >
+              {d}
+            </button>
           ))}
         </div>
         <div className="flex items-center gap-2">
@@ -979,28 +561,24 @@ const TABS: { id: TabId; label: string }[] = [
           {errCount === 0 && warnCount === 0 && code.trim() && <span className="font-mono text-xs font-bold px-3 py-1 rounded-full" style={{ background: "#10b98125", color: OK, border: `1px solid #10b98140` }}>✓ valid</span>}
         </div>
         
-        {/* ✅ NEW: Dirty / sync indicator */}
         <div className="flex items-center gap-2">
           {isDirty ? (
             <span className="font-mono text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5"
                   style={{ background: '#f59e0b18', color: '#fbbf24', border: '1px solid #f59e0b35' }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%',
-                            background: '#fbbf24', display: 'inline-block' }} />
-              local edit — not persisted
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fbbf24', display: 'inline-block' }} />
+              local edit
             </span>
           ) : (
             <span className="font-mono text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5"
                   style={{ background: '#10b98118', color: '#34d399', border: '1px solid #10b98135' }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%',
-                            background: '#34d399', display: 'inline-block' }} />
-              in sync with server
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34d399', display: 'inline-block' }} />
+              in sync
             </span>
           )}
         </div>
         
         <div className="ml-auto flex items-center gap-4">
           <span className="font-mono text-xs" style={{ color: TEXT3 }}>v1.1.0</span>
-          {/* ✅ UPDATED: Reset button clears dirty state */}
           <button
             onClick={() => { setCode(OL_TEMPLATES[domain]); setActiveError(null); setIsDirty(false); }}
             className="font-mono text-sm px-3 py-1 rounded-lg transition-all hover:text-white"
@@ -1037,7 +615,6 @@ const TABS: { id: TabId; label: string }[] = [
                 </div>
               ))}
               
-              {/* ✅ Simplified: Legal domain now only has task_instructions (no task_type selector) */}
               {domain === "legal" && (
                 <div className="mt-4 pt-4 border-t" style={{ borderColor: BORDER }}>
                   <label className="flex items-center gap-1 text-sm font-semibold mb-1.5" style={{ color: TEXT2 }}>
@@ -1056,7 +633,6 @@ const TABS: { id: TabId; label: string }[] = [
             </div>
           </div>
 
-           {/* ── Bed Manager Panel — health domain only ── */}
           {domain === "health" && <BedManagerPanel {...bedState} />}
 
           {domain === "finance" && (
@@ -1135,12 +711,9 @@ const TABS: { id: TabId; label: string }[] = [
           <div className="flex items-center justify-between px-5 py-2.5" style={{ background: "#060c18", borderBottom: `1px solid ${BORDER}` }}>
             <div className="flex items-center gap-3">
               <div className="flex gap-1.5">{["#ff5f57","#ffbd2e","#28c840"].map((c) => <span key={c} className="w-3 h-3 rounded-full" style={{ background: c }} />)}</div>
-              {/* ✅ UPDATED: Filename label shows modified indicator */}
               <span className="font-mono text-sm font-medium" style={{ color: TEXT3 }}>
                 {domain}-workflow.ol
-                {isDirty && (
-                  <span style={{ color: '#fbbf24', marginLeft: 6, fontSize: 11 }}>● modified</span>
-                )}
+                {isDirty && <span style={{ color: '#fbbf24', marginLeft: 6, fontSize: 11 }}>● modified</span>}
               </span>
             </div>
             <div className="flex items-center gap-3">
@@ -1180,10 +753,8 @@ const TABS: { id: TabId; label: string }[] = [
               </div>
             )}
 
-            {/* ── Customer View ── */}
             {tab === "customer" && <CustomerView domain={domain} result={result} error={error} accent={accent} />}
 
-            {/* ── Execution Trace ── */}
             {result && tab === "trace" && (
               <div className="space-y-3">
                 {result.steps.map((s) => (
@@ -1204,7 +775,6 @@ const TABS: { id: TabId; label: string }[] = [
               </div>
             )}
 
-            {/* ── Safety Logs ── */}
             {result && tab === "safety" && (
               <div className="space-y-3">
                 {!result.ok && result.safety.events.some(e => e.type === "block") && (
@@ -1228,7 +798,6 @@ const TABS: { id: TabId; label: string }[] = [
               </div>
             )}
 
-            {/* ── Audit Trail ── */}
             {result && tab === "audit" && (
               <div className="space-y-4">
                 {([
@@ -1247,7 +816,6 @@ const TABS: { id: TabId; label: string }[] = [
               </div>
             )}
 
-            {/* ── Verified Intent ── */}
             {result && tab === "intent" && (
               <div className="space-y-5">
                 <div>
@@ -1279,15 +847,393 @@ const TABS: { id: TabId; label: string }[] = [
               </div>
             )}
 
-            {/* ── Bed Manager ── */}
             {tab === "beds" && domain === "health" && <BedManagerTab {...bedState} />}
-
           </div>
         </div>
       </div>
     </div>
   );
 }
+
+// ── HELPER COMPONENTS (LegalResponseView, FinanceResponseView, etc.) ──────────
+// ... (Include the helper components from your original code here: unwrapLegalResponse, parseMd, InlineText, RiskBadge, Section, LegalResponseView, FinanceResponseView, HealthResponseView, BlockedView, CustomerView)
+// For brevity, I'm assuming you have these defined as in your previous snippet. 
+// Ensure they are included in the file before PlaygroundClient or imported.
+
+function unwrapLegalResponse(raw: string): string {
+  if (!raw) return '';
+  let text = raw.trim();
+  for (let i = 0; i < 3; i++) {
+    if (!text.startsWith('{') && !text.startsWith('"')) break;
+    try {
+      const parsed = JSON.parse(text);
+      if (typeof parsed === 'string') { text = parsed; continue; }
+      if (parsed?.response)  { text = parsed.response;  continue; }
+      if (parsed?.reply)     { text = parsed.reply;     continue; }
+      if (parsed?.content)   { text = parsed.content;   continue; }
+      break;
+    } catch { break; }
+  }
+  return text.trim();
+}
+
+type Block =
+  | { kind: 'h2'; text: string }
+  | { kind: 'h3'; text: string }
+  | { kind: 'p';  text: string }
+  | { kind: 'ul'; items: string[] }
+  | { kind: 'ol'; items: string[] }
+  | { kind: 'risk'; items: string[] }
+  | { kind: 'divider' };
+
+function parseMd(text: string): Block[] {
+  const lines = text.split('\n');
+  const blocks: Block[] = [];
+  let listBuf: string[] = [];
+  let listKind: 'ul' | 'ol' = 'ul';
+  let isRiskList = false;
+
+  const flushList = () => {
+    if (!listBuf.length) return;
+    blocks.push(isRiskList ? { kind: 'risk', items: [...listBuf] } : { kind: listKind, items: [...listBuf] });
+    listBuf = []; isRiskList = false;
+  };
+  const isRiskLine = (s: string) => /\[(HIGH|MEDIUM|LOW)\]/i.test(s);
+
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    if (!line.trim()) { flushList(); continue; }
+    if (/^## /.test(line)) { flushList(); blocks.push({ kind: 'h2', text: line.replace(/^## /, '').trim() }); continue; }
+    if (/^### /.test(line)) { flushList(); blocks.push({ kind: 'h3', text: line.replace(/^### /, '').trim() }); continue; }
+    if (/^[A-Z][A-Z\s&\/]{3,}:?$/.test(line.trim())) { flushList(); blocks.push({ kind: 'h3', text: line.trim().replace(/:$/, '') }); continue; }
+    if (/^[-*•] /.test(line.trim())) {
+      const content = line.trim().replace(/^[-*•] /, '');
+      if (listBuf.length && listKind !== 'ul') flushList();
+      listKind = 'ul';
+      if (isRiskLine(content)) isRiskList = true;
+      listBuf.push(content);
+      continue;
+    }
+    if (/^\d+\. /.test(line.trim())) {
+      const content = line.trim().replace(/^\d+\. /, '');
+      if (listBuf.length && listKind !== 'ol') flushList();
+      listKind = 'ol';
+      listBuf.push(content);
+      continue;
+    }
+    flushList();
+    const t = line.trim();
+    if (t) blocks.push({ kind: 'p', text: t });
+  }
+  flushList();
+  return blocks;
+}
+
+function InlineText({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return (
+    <>
+      {parts.map((p, i) =>
+        p.startsWith('**') && p.endsWith('**')
+          ? <strong key={i} style={{ fontWeight: 600, color: 'inherit' }}>{p.slice(2, -2)}</strong>
+          : <span key={i}>{p}</span>
+      )}
+    </>
+  );
+}
+
+function RiskBadge({ text }: { text: string }) {
+  const high = /\[HIGH\]/i.test(text);
+  const medium = /\[MEDIUM\]/i.test(text);
+  const clean = text.replace(/\[(HIGH|MEDIUM|LOW)\]\s*/i, '').trim();
+  const [bg, border, labelColor, label] = high
+    ? ['#2d0a0a', '#7f1d1d', '#f87171', 'HIGH']
+    : medium ? ['#2a1a00', '#78350f', '#fbbf24', 'MEDIUM']
+    : ['#0a1628', '#1e3a5f', '#64748b', 'LOW'];
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 12px', marginBottom: 5, background: bg, border: `1px solid ${border}`, borderRadius: 8 }}>
+      <span style={{ fontFamily: 'monospace', fontSize: 10, fontWeight: 700, color: labelColor, border: `1px solid ${border}`, padding: '2px 6px', borderRadius: 4, flexShrink: 0, marginTop: 1, letterSpacing: '0.05em' }}>{label}</span>
+      <span style={{ fontSize: 13, color: '#cbd5e1', lineHeight: 1.5 }}>{clean}</span>
+    </div>
+  );
+}
+
+function Section({ label, accent, children }: { label?: string; accent?: string; children: React.ReactNode }) {
+  return (
+    <div style={{ background: '#08111e', border: '1px solid #1a2840', borderRadius: 10, overflow: 'hidden', marginBottom: 12 }}>
+      {label && (
+        <div style={{ padding: '8px 14px', borderBottom: '1px solid #1a2840', background: '#060c18' }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: accent ?? '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</span>
+        </div>
+      )}
+      <div style={{ padding: '12px 14px' }}>{children}</div>
+    </div>
+  );
+}
+
+function LegalResponseView({ response }: { response: string }) {
+  const text = unwrapLegalResponse(response);
+  const blocks = parseMd(text);
+  type Group = { heading: string | null; accent: string | null; blocks: Block[] };
+  const groups: Group[] = [];
+  let cur: Group = { heading: null, accent: null, blocks: [] };
+  const SECTION_ACCENTS: Record<string, string> = {
+    'parties': '#60a5fa', 'party': '#60a5fa',
+    'clause': '#a78bfa',
+    'date': '#34d399', 'deadline': '#34d399',
+    'obligation': '#fb923c',
+    'risk': '#f87171', 'flag': '#f87171',
+    'summary': '#94a3b8', 'document': '#94a3b8', 'overview': '#94a3b8',
+    'type': '#94a3b8', 'jurisdiction': '#94a3b8',
+  };
+  const accentForHeading = (h: string) => {
+    const lc = h.toLowerCase();
+    for (const [key, color] of Object.entries(SECTION_ACCENTS)) {
+      if (lc.includes(key)) return color;
+    }
+    return '#8b5cf6';
+  };
+  for (const block of blocks) {
+    if (block.kind === 'h2' || block.kind === 'h3') {
+      if (cur.blocks.length || cur.heading) groups.push(cur);
+      cur = { heading: block.text, accent: accentForHeading(block.text), blocks: [] };
+    } else {
+      cur.blocks.push(block);
+    }
+  }
+  if (cur.blocks.length || cur.heading) groups.push(cur);
+  const renderBlock = (block: Block, i: number) => {
+    switch (block.kind) {
+      case 'p':
+        return (
+          <p key={i} style={{ margin: '0 0 10px', fontSize: 13, color: '#cbd5e1', lineHeight: 1.7 }}>
+            <InlineText text={block.text} />
+          </p>
+        );
+      case 'ul':
+        return (
+          <ul key={i} style={{ margin: '0 0 10px', padding: 0, listStyle: 'none' }}>
+            {block.items.map((item, j) => (
+              <li key={j} style={{ display: 'flex', gap: 10, marginBottom: 6, fontSize: 13, color: '#cbd5e1', lineHeight: 1.55 }}>
+                <span style={{ color: '#8b5cf6', flexShrink: 0, marginTop: 2, fontSize: 10 }}>▸</span>
+                <span><InlineText text={item} /></span>
+              </li>
+            ))}
+          </ul>
+        );
+      case 'ol':
+        return (
+          <ol key={i} style={{ margin: '0 0 10px', padding: 0, listStyle: 'none' }}>
+            {block.items.map((item, j) => (
+              <li key={j} style={{ display: 'flex', gap: 10, marginBottom: 6, fontSize: 13, color: '#cbd5e1', lineHeight: 1.55 }}>
+                <span style={{ color: '#8b5cf6', flexShrink: 0, fontWeight: 700, fontSize: 11, marginTop: 2, minWidth: 16 }}>{j + 1}.</span>
+                <span><InlineText text={item} /></span>
+              </li>
+            ))}
+          </ol>
+        );
+      case 'risk':
+        return (
+          <div key={i} style={{ marginBottom: 4 }}>
+            {block.items.map((item, j) => <RiskBadge key={j} text={item} />)}
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+  if (!groups.length) {
+    return (
+      <p style={{ margin: 0, fontSize: 13, color: '#cbd5e1', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+        {text}
+      </p>
+    );
+  }
+  return (
+    <div>
+      {groups.map((group, gi) => {
+        if (!group.heading) {
+          return (
+            <div key={gi} style={{ marginBottom: 12 }}>
+              {group.blocks.map((b, bi) => renderBlock(b, bi))}
+            </div>
+          );
+        }
+        return (
+          <Section key={gi} label={group.heading} accent={group.accent ?? '#8b5cf6'}>
+            {group.blocks.map((b, bi) => renderBlock(b, bi))}
+          </Section>
+        );
+      })}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', marginTop: 4, background: '#060d1a', border: '1px solid #1a2840', borderRadius: 8 }}>
+        <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+          <path d="M7 1L2 3.5v4C2 10.5 4.5 13 7 14c2.5-1 5-3.5 5-6.5v-4L7 1z" stroke="#8b5cf6" strokeWidth="1.2" fill="none"/>
+        </svg>
+        <span style={{ fontSize: 11, color: '#475569' }}>Extract-only · No legal advice provided · Consult a qualified legal professional</span>
+      </div>
+    </div>
+  );
+}
+
+function FinanceResponseView({ response }: { response: string }) {
+  const cleanText = unwrapLegalResponse(response);
+  const balanceMatch = cleanText.match(/\$[\d,]+\.?\d{0,2}|NGN\s?[\d,]+|₦[\d,]+/);
+  const balance = balanceMatch ? balanceMatch[0] : null;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {balance && (
+        <div style={{ background: '#0a1628', border: '1px solid #3b82f640', borderRadius: 10, padding: '16px 20px' }}>
+          <div style={{ fontSize: 11, color: TEXT3, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 6 }}>Account balance</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: OK, fontFamily: 'monospace', letterSpacing: '-0.5px' }}>{balance}</div>
+        </div>
+      )}
+      <div style={{ background: '#08111e', border: `1px solid ${BORDER2}`, borderRadius: 10, padding: '14px 16px' }}>
+        <p style={{ margin: 0, fontSize: 14, color: TEXT, lineHeight: 1.7 }}>
+          <InlineText text={cleanText} />
+        </p>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#0a1628', border: `1px solid ${BORDER}`, borderRadius: 8 }}>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <rect x="1" y="1" width="12" height="12" rx="3" stroke="#3b82f6" strokeWidth="1.2"/>
+          <path d="M4 7h6M4 9.5h4" stroke="#3b82f6" strokeWidth="1.2" strokeLinecap="round"/>
+        </svg>
+        <span style={{ fontSize: 11, color: TEXT3 }}>Secure · Kernel verified · No transfer capabilities exposed</span>
+      </div>
+    </div>
+  );
+}
+
+function HealthResponseView({ response }: { response: string }) {
+  const cleanText = unwrapLegalResponse(response);
+  const statusMatch = cleanText.match(/\b(admitted|approved|pending|rejected|scheduled|confirmed)\b/i);
+  const status = statusMatch ? statusMatch[1].toLowerCase() : null;
+  const statusColor = status === 'admitted' || status === 'approved' || status === 'confirmed' ? OK : status === 'pending' || status === 'scheduled' ? WARN : TEXT3;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {status && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#08111e', border: `1px solid ${BORDER2}`, borderRadius: 10, padding: '12px 16px' }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: statusColor, flexShrink: 0 }} />
+          <span style={{ fontSize: 11, color: TEXT3, textTransform: 'uppercase', letterSpacing: '0.8px' }}>Admission status</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: statusColor, marginLeft: 'auto', textTransform: 'capitalize' }}>{status}</span>
+        </div>
+      )}
+      <div style={{ background: '#08111e', border: `1px solid ${BORDER2}`, borderRadius: 10, padding: '14px 16px' }}>
+        <p style={{ margin: 0, fontSize: 14, color: TEXT, lineHeight: 1.7 }}>
+          <InlineText text={cleanText} />
+        </p>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#0a1628', border: `1px solid ${BORDER}`, borderRadius: 8 }}>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M7 1L2 3.5v4C2 10.5 4.5 13 7 14c2.5-1 5-3.5 5-6.5v-4L7 1z" stroke="#10b981" strokeWidth="1.2" fill="none"/>
+        </svg>
+        <span style={{ fontSize: 11, color: TEXT3 }}>Scope-enforced · Team-restricted · Clinical governance active</span>
+      </div>
+    </div>
+  );
+}
+
+function BlockedView({ domain, violation, accent }: { domain: Domain; violation?: { action?: string }; accent: string }) {
+  const messages: Record<string, string> = {
+    account_transfer: "For security, transfers cannot be initiated through this channel. Please use your banking app, visit a branch, or call support.",
+    balance_modification: "This service is for balance enquiries only. To deposit or withdraw, please use the banking app or visit your nearest branch.",
+    speculative_balance: "I can only show your current account balance. For projections or financial planning, please speak with one of our advisors.",
+  };
+  const msg = violation?.action ? (messages[violation.action] ?? "We're unable to process this request. Please try a different query or contact support.") : "We're unable to process this request. Please try a different query or contact support.";
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#ef444415", border: "1px solid #ef444435", borderRadius: 10, padding: "12px 16px" }}>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="7" stroke={ERR} strokeWidth="1.3"/>
+          <path d="M8 4.5v4M8 11v.5" stroke={ERR} strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
+        <span style={{ fontSize: 12, fontWeight: 700, color: ERR }}>Request blocked by governance policy</span>
+      </div>
+      <div style={{ background: "#08111e", border: `1px solid ${BORDER2}`, borderRadius: 10, padding: "14px 16px" }}>
+        <p style={{ margin: 0, fontSize: 14, color: TEXT, lineHeight: 1.7 }}>{msg}</p>
+      </div>
+      <div style={{ fontSize: 11, color: TEXT3, padding: "6px 4px" }}>See Safety Logs tab for the full governance trace.</div>
+    </div>
+  );
+}
+
+function CustomerView({ domain, result, error, accent }: { domain: Domain; result: ExecutionResult | null; error: string | null; accent: string }) {
+  const domainLabel = domain === "finance" ? "Digital Banking Assistant" : domain === "health" ? "Clinical Support" : "Legal Document Summarizer";
+  const domainIcon = domain === "finance" ? (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <rect x="1" y="4" width="14" height="10" rx="2" stroke="white" strokeWidth="1.3"/>
+      <path d="M1 7h14" stroke="white" strokeWidth="1.3"/>
+      <path d="M4 10.5h2M4 12h4" stroke="white" strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+  ) : domain === "health" ? (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <rect x="5" y="1" width="6" height="14" rx="1.5" stroke="white" strokeWidth="1.3"/>
+      <rect x="1" y="5" width="14" height="6" rx="1.5" stroke="white" strokeWidth="1.3"/>
+    </svg>
+  ) : (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M8 1L2 3.5v4C2 10.5 4.5 13 7.5 14.5 10.5 13 13 10.5 13 7.5v-4L8 1z" stroke="white" strokeWidth="1.3" fill="none"/>
+    </svg>
+  );
+
+  if (!result && !error) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 16px", gap: 16, textAlign: "center" }}>
+        <div style={{ width: 56, height: 56, borderRadius: 16, background: accent + "15", border: `1px solid ${accent}25`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth="1.5" style={{ width: 28, height: 28 }}><path d="M5 3l14 9-14 9V3z"/></svg>
+        </div>
+        <div>
+          <p style={{ fontSize: 14, fontWeight: 600, color: TEXT, margin: "0 0 4px" }}>Run a workflow to see results</p>
+          <p style={{ fontSize: 13, color: TEXT2, margin: 0 }}>The user-facing output will appear here</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ width: 36, height: 36, borderRadius: "50%", background: accent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{domainIcon}</div>
+        <div>
+          <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: TEXT }}>{domainLabel}</p>
+          <p style={{ margin: 0, fontSize: 11, color: TEXT3 }}>Powered by O-Lang · Governed response</p>
+        </div>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, background: result?.ok ? "#10b98115" : "#ef444415", border: `1px solid ${result?.ok ? "#10b98130" : "#ef444430"}`, borderRadius: 20, padding: "4px 10px" }}>
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: result?.ok ? OK : ERR }} />
+          <span style={{ fontSize: 10, fontWeight: 700, color: result?.ok ? OK : ERR }}>{result?.ok ? "VERIFIED" : "BLOCKED"}</span>
+        </div>
+      </div>
+
+      {error && (
+        <div style={{ background: "#ef444415", border: "1px solid #ef444430", borderRadius: 10, padding: "14px 16px" }}>
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: ERR, marginBottom: 4 }}>Something went wrong</p>
+          <p style={{ margin: 0, fontSize: 13, color: TEXT2 }}>Please try again or check the kernel connection.</p>
+        </div>
+      )}
+
+      {result?.ok && result.response && (
+        domain === "legal" ? <LegalResponseView response={result.response} /> :
+        domain === "finance" ? <FinanceResponseView response={result.response} /> :
+        <HealthResponseView response={result.response} />
+      )}
+
+      {result && !result.ok && <BlockedView domain={domain} violation={result.violation} accent={accent} />}
+
+      {result && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", background: "#060d1a", border: `1px solid ${BORDER}`, borderRadius: 8 }}>
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+            <path d="M7 1L2 3.5v4C2 10.5 4.5 13 7 14c2.5-1 5-3.5 5-6.5v-4L7 1z" stroke={result.ok ? OK : TEXT3} strokeWidth="1.2" fill="none"/>
+          </svg>
+          <span style={{ fontSize: 11, color: TEXT3, flex: 1 }}>
+            {result.ok ? "Response verified by O-Lang kernel · No policy violations" : "Request reviewed by O-Lang kernel · See Safety Logs for details"}
+          </span>
+          <span style={{ fontFamily: "monospace", fontSize: 10, color: TEXT3 }}>{result.audit?.execution_hash?.slice(0, 12) ?? ""}…</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // "use client";
 
 // import { useState, useCallback, useRef, useEffect } from "react";
