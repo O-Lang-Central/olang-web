@@ -72,7 +72,7 @@ export function ApplicationsSection() {
             </div>
             
             <Link 
-              href="/docs/healthcare"
+              href="/playground?domain=healthcare"
               className="inline-flex items-center gap-2 text-[15px] font-semibold text-emerald-400 hover:text-emerald-300 transition-colors"
             >
               See Healthcare Workflows →
