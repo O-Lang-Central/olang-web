@@ -123,7 +123,7 @@ export function ApplicationsSection() {
             </svg>
           </Link>
           <p className="text-[12px] text-white/50 mt-4">
-            Works on WordPress, React, static HTML — or integrate deeper via our SDK
+            Works on WordPress, React, static HTML — or integrate deeper via our SDK.
           </p>
         </div>
         
