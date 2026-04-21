@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PlaygroundClient } from "@/components/playground/playgroundClient";
+import { PlaygroundClient } from "@/components/playground/PlaygroundClient";
 
 export const metadata: Metadata = {
   title: "Playground — O-Lang",
