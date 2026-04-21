@@ -615,10 +615,19 @@ export default function LabClient() {
     }
   };
 
-  const loadTutorial = (idx: number) => {
+   const loadTutorial = (idx: number) => {
     const t = TUTORIALS[idx];
     setCode(t.code);
-    setInputs(t.inputs);
+    
+    // ✅ Fix: Filter out undefined/null values to match Record<string, string>
+    const cleanInputs: Record<string, string> = {};
+    Object.entries(t.inputs).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        cleanInputs[key] = value;
+      }
+    });
+    setInputs(cleanInputs);
+    
     setResult(null);
     setError(null);
     setActiveError(null);
