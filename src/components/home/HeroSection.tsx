@@ -38,7 +38,7 @@ export function HeroSection() {
       >
         <span className="w-1.5 h-1.5 rounded-full bg-blue-muted shadow-[0_0_0_3px_rgba(96,165,250,0.25)] animate-pulse-ring" />
         <span className="font-mono text-[12px] text-blue-muted tracking-[0.4px]">
-          Governed AI runtime · Production-ready · MIT Licensed
+            Governed AI runtime · Auto PII redaction · MIT Licensed
         </span>
       </motion.div>
 
@@ -56,15 +56,16 @@ export function HeroSection() {
 
       {/* Subheading */}
       <motion.p
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.55, delay: 0.18 }}
-        className="text-[clamp(16px,2vw,20px)] text-white/65 max-w-[600px] leading-[1.65] mb-4"
-      >
-        O-Lang is a governed workflow language with its own runtime, tool registry,
-        and cryptographic audit layer. Write AI workflows that can&apos;t lie, leak data,
-        or exceed their declared scope — from first line to production.
-      </motion.p>
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.55, delay: 0.18 }}
+  className="text-[clamp(16px,2vw,20px)] text-white/65 max-w-[600px] leading-[1.65] mb-4"
+>
+  Most AI systems can&apos;t prove they didn&apos;t leak sensitive data. O-Lang can.
+  A governed runtime that enforces what your AI can do, automatically redacts
+  PII across 20+ languages, and produces a signed audit trail for every
+  execution — built for regulated industries that can&apos;t afford to guess.
+</motion.p>
 
       {/* Compatibility note */}
       <motion.p

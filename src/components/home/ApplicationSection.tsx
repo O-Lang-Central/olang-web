@@ -18,13 +18,12 @@ export function ApplicationsSection() {
           
           {/* 🏦 Finance — Primary Highlight */}
           <Card hover accentColor="#1a56db" className="relative overflow-hidden">
-            <span className="absolute top-4 right-4 inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-500/15 border border-green-500/30 text-green-400 rounded-full text-[11px] font-medium">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              60-Second Deploy
-            </span>
-            
+           <span className="absolute top-4 right-4 inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/90 border border-white/60 text-gray-800 rounded-full text-[13px] font-medium">
+  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+  </svg>
+  60-Second Deploy
+</span>
             <div className="w-12 h-12 rounded-[11px] bg-[#eff6ff] flex items-center justify-center mb-5">
               <span className="text-2xl">🏦</span>
             </div>
@@ -111,7 +110,7 @@ export function ApplicationsSection() {
         {/* Bottom CTA Bar */}
         <div className="mt-14 rounded-[18px] bg-[linear-gradient(135deg,#0c1220,#1a2540)] border border-border p-8 text-center reveal">
           <p className="text-[15px] text-white/80 mb-5 max-w-[500px] mx-auto">
-            <span className="font-semibold text-white">Start in 60 seconds:</span> Add a governed chatbot to any website. No code required.
+            <span className="font-semibold text-white">Deploy in 3 minutes :</span> Add a governed chatbot to any website. No code required.
           </p>
           <Link
             href="/embed"

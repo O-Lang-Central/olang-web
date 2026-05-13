@@ -49,7 +49,7 @@ export function Navbar() {
           O<span className="text-blue-muted">-Lang</span>
         </span>
         <span className="font-mono text-[10px] text-blue-muted bg-blue-muted/10 border border-blue-muted/20 px-[7px] py-[2px] rounded">
-          v1.1.0
+          v1.3.0
         </span>
       </Link>
 
