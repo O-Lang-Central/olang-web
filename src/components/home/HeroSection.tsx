@@ -4,20 +4,31 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 
 const CODE = `<span class="t-cm">// O-Lang — Bank Balance Workflow</span>
-<span class="t-kw">Workflow</span> <span class="t-str">"Bank Balance Check"</span> <span class="t-key">with</span> <span class="t-val">user_question</span><span class="t-op">,</span> <span class="t-val">customer_id</span>
+<span class="t-kw">Workflow</span> <span class="t-str">"Bank Balance Check"</span> <span class="t-key">with</span> <span class="t-val">user_question</span><span class="t-op">,</span> <span class="t-val">customer_id</span><span class="t-op">,</span> <span class="t-val">locale</span>
 
 <span class="t-kw">Allow resolvers:</span>
 <span class="t-op">-</span> <span class="t-str">@o-lang/bank-account-lookup</span>
+<span class="t-op">-</span> <span class="t-str">@o-lang/currency-format</span>
 <span class="t-op">-</span> <span class="t-str">@o-lang/llm-groq</span>
 
 <span class="t-key">Step 1:</span> <span class="t-kw">Ask</span> <span class="t-str">@o-lang/bank-account-lookup</span> <span class="t-val">"{customer_id}"</span>
 <span class="t-kw">Save as</span> <span class="t-fn">account_info</span>
 
-<span class="t-key">Step 2:</span> <span class="t-kw">Ask</span> <span class="t-str">@o-lang/llm-groq</span> <span class="t-val">"{user_question}.
-Balance is {account_info.balance}."</span>
+<span class="t-key">Step 2:</span> <span class="t-kw">Ask</span> <span class="t-str">@o-lang/currency-format</span> <span class="t-val">"{account_info.balance}" "{locale}"</span>
+<span class="t-kw">Save as</span> <span class="t-fn">formatted_balance</span>
+
+<span class="t-key">Step 3:</span> <span class="t-kw">Ask</span> <span class="t-str">@o-lang/llm-groq</span> <span class="t-val">"{user_question}.
+Balance is {formatted_balance}."</span>
 <span class="t-kw">Save as</span> <span class="t-fn">response</span>
 
 <span class="t-kw">Return</span> <span class="t-fn">response</span>`;
+
+const LOCALE_OUTPUTS = [
+  { locale: "en-US", flag: "🇺🇸", output: '"Your current balance is $12,450.00"', color: "text-green-muted" },
+  { locale: "en-NG", flag: "🇳🇬", output: '"Your current balance is ₦12,450.00"', color: "text-emerald-400" },
+  { locale: "fr-FR", flag: "🇫🇷", output: '"Votre solde actuel est 12 450,00 €"', color: "text-blue-400" },
+  { locale: "en-GB", flag: "🇬🇧", output: '"Your current balance is £12,450.00"', color: "text-violet-400" },
+];
 
 export function HeroSection() {
   return (
@@ -38,7 +49,7 @@ export function HeroSection() {
       >
         <span className="w-1.5 h-1.5 rounded-full bg-blue-muted shadow-[0_0_0_3px_rgba(96,165,250,0.25)] animate-pulse-ring" />
         <span className="font-mono text-[12px] text-blue-muted tracking-[0.4px]">
-            Governed AI runtime · Auto PII redaction · MIT Licensed
+          Governed AI runtime · PII redaction in 20+ languages · MIT Licensed
         </span>
       </motion.div>
 
@@ -56,16 +67,17 @@ export function HeroSection() {
 
       {/* Subheading */}
       <motion.p
-  initial={{ opacity: 0, y: 20 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ duration: 0.55, delay: 0.18 }}
-  className="text-[clamp(16px,2vw,20px)] text-white/65 max-w-[600px] leading-[1.65] mb-4"
->
-  Most AI systems can&apos;t prove they didn&apos;t leak sensitive data. O-Lang can.
-  A governed runtime that enforces what your AI can do, automatically redacts
-  PII across 20+ languages, and produces a signed audit trail for every
-  execution — built for regulated industries that can&apos;t afford to guess.
-</motion.p>
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.55, delay: 0.18 }}
+        className="text-[clamp(16px,2vw,20px)] text-white/65 max-w-[620px] leading-[1.65] mb-4"
+      >
+        O-Lang was forged in the world&apos;s most demanding deployment conditions —
+        multilingual populations, fragmented regulation, zero-tolerance compliance.
+        A governed runtime that enforces what your AI can do, automatically redacts
+        PII, and produces a signed audit trail for every execution.
+        <span className="text-white/45"> If it works here, it works anywhere.</span>
+      </motion.p>
 
       {/* Compatibility note */}
       <motion.p
@@ -101,7 +113,7 @@ export function HeroSection() {
         </Link>
       </motion.div>
 
-      {/* ── ISO compliance trust strip ────────────────────────────── */}
+      {/* ── Compliance trust strip ── */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -111,12 +123,13 @@ export function HeroSection() {
         {[
           { label: "ISO 42001", sub: "AI Management" },
           { label: "ISO 27001", sub: "Information Security" },
+          { label: "GDPR", sub: "EU Data Protection" },
+          { label: "NDPR", sub: "Nigerian Compliance" },
         ].map(({ label, sub }) => (
           <div
             key={label}
             className="inline-flex items-center gap-2 bg-white/[0.04] border border-white/[0.10] rounded-full px-3.5 py-1.5"
           >
-            {/* Checkmark circle */}
             <svg viewBox="0 0 14 14" className="w-3.5 h-3.5 shrink-0" fill="none">
               <circle cx="7" cy="7" r="6" stroke="rgba(96,165,250,0.55)" strokeWidth="1.2" />
               <path
@@ -134,13 +147,8 @@ export function HeroSection() {
           </div>
         ))}
 
-        {/* Separator dot */}
         <span className="w-1 h-1 rounded-full bg-white/15" />
-
-        {/* Aligned label */}
-        <span className="font-mono text-[11px] text-white/25 tracking-[0.5px]">
-          aligned
-        </span>
+        <span className="font-mono text-[11px] text-white/25 tracking-[0.5px]">aligned</span>
       </motion.div>
 
       {/* Code window */}
@@ -171,19 +179,31 @@ export function HeroSection() {
             <pre dangerouslySetInnerHTML={{ __html: CODE }} />
           </div>
 
-          {/* Output strip */}
-          <div className="flex items-center gap-3 px-7 py-3.5 border-t border-white/[0.07]">
-            <span className="font-mono text-[11px] text-white/25 uppercase tracking-[0.8px]">output</span>
-            <span className="font-mono text-[13px] text-green-muted">&quot;Your current balance is $12,450.00&quot;</span>
-            <div className="ml-auto flex items-center gap-1.5 bg-green/12 border border-green/25 rounded-full px-2.5 py-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-muted shadow-[0_0_6px_rgba(52,211,153,0.6)]" />
-              <span className="font-mono text-[11px] text-green-muted tracking-[0.3px]">kernel-governed · 432ms</span>
+          {/* ── Multi-locale output strip ── */}
+          <div className="border-t border-white/[0.07]">
+            <div className="flex items-center gap-3 px-7 py-2.5 border-b border-white/[0.04]">
+              <span className="font-mono text-[11px] text-white/25 uppercase tracking-[0.8px]">
+                same workflow · any locale
+              </span>
+              <div className="ml-auto flex items-center gap-1.5 bg-green/12 border border-green/25 rounded-full px-2.5 py-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-muted shadow-[0_0_6px_rgba(52,211,153,0.6)]" />
+                <span className="font-mono text-[11px] text-green-muted tracking-[0.3px]">kernel-governed · 432ms</span>
+              </div>
+            </div>
+            <div className="px-7 py-3 grid grid-cols-2 gap-x-6 gap-y-2">
+              {LOCALE_OUTPUTS.map(({ locale, flag, output, color }) => (
+                <div key={locale} className="flex items-center gap-2.5">
+                  <span className="text-[13px]">{flag}</span>
+                  <span className="font-mono text-[10px] text-white/30 w-12 shrink-0">{locale}</span>
+                  <span className={`font-mono text-[12px] ${color} truncate`}>{output}</span>
+                </div>
+              ))}
             </div>
           </div>
 
           {/* Language badge strip */}
           <div className="flex items-center gap-2 px-7 py-2.5 border-t border-white/[0.05]" style={{ background: "rgba(255,255,255,0.015)" }}>
-            <span className="font-mono text-[10px] text-white/30 uppercase tracking-widest">tools run on</span>
+            <span className="font-mono text-[10px] text-white/30 uppercase tracking-widest">runs on</span>
             {["Groq", "OpenAI", "Anthropic", "any HTTP API", "your own tools"].map((lang) => (
               <span key={lang} className="font-mono text-[10px] px-2 py-0.5 rounded"
                     style={{ color: "rgba(255,255,255,0.45)", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>

@@ -4,11 +4,14 @@ import { RegistryPreview } from "@/components/home/RegistryPreview";
 import { PlaygroundPreview } from "@/components/home/PlaygroundPreview";
 import { ScrollReveal } from "@/components/home/ScrollReveal";
 import { ApplicationsSection } from "@/components/home/ApplicationSection";
+import { ComparisonSection } from "@/components/home/Comparisonsection";
+import { CommunitySection } from "@/components/home/Communitysection";
 
 export default function HomePage() {
   return (
     <>
       <HeroSection />
+      <ComparisonSection/>
       <ApplicationsSection/>
       <StatsStrip />
       <HowItWorksSection />
@@ -20,6 +23,7 @@ export default function HomePage() {
       <DomainsSection />
       <DocsTeaserSection />
       <CtaSection />
+      <CommunitySection />
       <ScrollReveal />
     </>
   );
