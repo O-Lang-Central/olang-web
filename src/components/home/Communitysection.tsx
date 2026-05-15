@@ -19,7 +19,7 @@ const LINKS = [
     ),
     label: "Star on GitHub",
     sub: "Follow development",
-    href: "https://github.com/orgs/O-Lang-Central",
+    href: "https://github.com/o-lang",
     color: "hover:border-white/30 hover:bg-white/[0.07]",
     iconColor: "text-white/60 group-hover:text-white",
     labelColor: "text-white/85 group-hover:text-white",
@@ -32,7 +32,7 @@ const LINKS = [
     ),
     label: "Join Discord",
     sub: "Talk to the builders",
-    href: "https://discord.gg/Dwt9Fngay",
+    href: "https://discord.gg/olang",
     color: "hover:border-indigo-400/40 hover:bg-indigo-500/[0.10]",
     iconColor: "text-indigo-300/70 group-hover:text-indigo-300",
     labelColor: "text-white/85 group-hover:text-indigo-200",
@@ -62,13 +62,19 @@ export function CommunitySection() {
     if (!email.trim() || !email.includes("@")) return;
     setStatus("loading");
     try {
-      await new Promise(resolve => setTimeout(resolve, 900));
+      const res = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Unknown error");
       setStatus("success");
       setMessage("You're on the list. We'll be in touch.");
       setEmail("");
-    } catch {
+    } catch (err) {
       setStatus("error");
-      setMessage("Something went wrong. Try again.");
+      setMessage(err instanceof Error ? err.message : "Something went wrong. Try again.");
     }
   };
 
@@ -135,7 +141,8 @@ export function CommunitySection() {
               {/* was text-white/50 — bumped to /65 for readability on dark bg */}
               <p className="text-[14px] text-white/65 leading-relaxed mb-8 max-w-[340px]">
                 Get notified when we ship new resolvers, compliance frameworks, and
-                deployment guides. No spam — just signal.
+                deployment guides — plus AI training updates and developer onboarding
+                tutorials as they drop. No spam — just signal.
               </p>
 
               {status === "success" ? (
