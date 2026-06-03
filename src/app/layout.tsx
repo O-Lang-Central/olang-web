@@ -61,7 +61,7 @@ export default function RootLayout({
         <main>{children}</main>
         <Footer />
         
-        {/* ✅ GOOGLE ANALYTICS — CLEAN ID, NO TRAILING SPACES */}
+        {/* ✅ GOOGLE ANALYTICS --— CLEAN ID, NO TRAILING SPACES */}
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-X0FRK316RG"
           strategy="afterInteractive"
