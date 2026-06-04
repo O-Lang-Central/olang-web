@@ -79,10 +79,10 @@ export function ApplicationsSection() {
             </div>
 
             <Link
-              href="/embed"
+                 href="/playground?domain=finance"
               className="inline-flex items-center gap-2 text-[15px] font-semibold text-blue-400 hover:text-blue-300 transition-colors"
             >
-              Deploy Finance Chatbot →
+              See Finance Workflow →
             </Link>
           </Card>
 
