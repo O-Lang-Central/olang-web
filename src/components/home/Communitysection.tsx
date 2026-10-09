@@ -79,15 +79,13 @@ export function CommunitySection() {
   };
 
   return (
-    // ── Section background: match site's true near-black, not surface-1 grey ──
     <section
       id="community"
-      className="py-24 px-[5%] border-t border-white/[0.08]"
-      style={{ background: "linear-gradient(180deg, #060d1a 0%, #050c18 100%)" }}
+      className="py-24 px-[5%] border-t border-slate-900 bg-slate-950"
     >
       <div className="max-w-[900px] mx-auto">
 
-        {/* Stats strip — boosted contrast on label */}
+        {/* Stats strip */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -97,16 +95,14 @@ export function CommunitySection() {
         >
           {STATS.map(({ value, label }) => (
             <div key={label} className="text-center">
-              <p className="font-syne text-[36px] font-extrabold text-white tracking-[-1px] leading-none">{value}</p>
-              {/* was text-white/35 — now /55 so it's legible on near-black */}
-              <p className="font-mono text-[11px] text-white/55 uppercase tracking-widest mt-1">{label}</p>
+              <p className="font-syne text-[36px] font-extrabold text-slate-100 tracking-[-1px] leading-none">{value}</p>
+              <p className="font-mono text-[11px] text-slate-500 uppercase tracking-widest mt-1">{label}</p>
             </div>
           ))}
-          <div className="hidden md:block w-px h-10 bg-white/[0.12]" />
+          <div className="hidden md:block w-px h-10 bg-slate-800" />
           <div className="text-center">
-            {/* was text-white/60 — fine, kept */}
-            <p className="font-syne text-[15px] font-semibold text-white/65 leading-snug max-w-[200px]">
-              Built in public.<br />Used in production.
+            <p className="font-syne text-[15px] font-semibold text-slate-300 leading-snug max-w-[200px]">
+              Forged in Africa.<br />Scaled Globally.
             </p>
           </div>
         </motion.div>
@@ -117,41 +113,32 @@ export function CommunitySection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          // Tighter, darker gradient + crisper border — matches site card style
-          className="rounded-[24px] overflow-hidden"
-          style={{
-            background: "linear-gradient(135deg, #0a1628 0%, #0d1b2e 60%, #0f1f35 100%)",
-            border: "1px solid rgba(255,255,255,0.10)",
-            boxShadow: "0 0 0 1px rgba(26,86,219,0.08) inset, 0 32px 80px rgba(0,0,0,0.5)",
-          }}
+          className="rounded-[24px] overflow-hidden border border-slate-800 bg-slate-900 shadow-2xl shadow-black/50"
         >
           <div className="grid md:grid-cols-2 gap-0">
 
             {/* Left — Email capture */}
-            <div className="p-10 border-b md:border-b-0 md:border-r border-white/[0.08]">
-              <div className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-400/25 rounded-full px-3 py-1 mb-6">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-                {/* was text-blue-muted (unknown token) — explicit color */}
-                <span className="font-mono text-[11px] text-blue-300 tracking-[0.3px]">Early access</span>
+            <div className="p-10 border-b md:border-b-0 md:border-r border-slate-800">
+              <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-full px-3 py-1 mb-6">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                <span className="font-mono text-[11px] text-amber-400 tracking-[0.3px]">Early Access</span>
               </div>
 
-              <h3 className="font-syne text-[28px] font-extrabold text-white tracking-[-1px] leading-[1.15] mb-3">
+              <h3 className="font-syne text-[28px] font-extrabold text-slate-100 tracking-[-1px] leading-[1.15] mb-3">
                 Stay ahead of<br />governed AI.
               </h3>
-              {/* was text-white/50 — bumped to /65 for readability on dark bg */}
-              <p className="text-[14px] text-white/65 leading-relaxed mb-8 max-w-[340px]">
+              <p className="text-[14px] text-slate-400 leading-relaxed mb-8 max-w-[340px]">
                 Get notified when we ship new resolvers, compliance frameworks, and
-                deployment guides — plus AI training updates and developer onboarding
-                tutorials as they drop. No spam — just signal.
+                deployment guides. No spam — just signal.
               </p>
 
               {status === "success" ? (
-                <div className="flex items-center gap-3 px-5 py-4 rounded-[12px] bg-emerald-500/10 border border-emerald-400/25">
+                <div className="flex items-center gap-3 px-5 py-4 rounded-[12px] bg-emerald-500/10 border border-emerald-500/20">
                   <svg viewBox="0 0 20 20" fill="none" className="w-5 h-5 shrink-0">
-                    <circle cx="10" cy="10" r="9" stroke="rgba(52,211,153,0.7)" strokeWidth="1.3" />
-                    <path d="M6.5 10l2.5 2.5 4.5-5" stroke="rgba(52,211,153,1)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="10" cy="10" r="9" stroke="#10B981" strokeWidth="1.3" />
+                    <path d="M6.5 10l2.5 2.5 4.5-5" stroke="#10B981" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  <p className="text-[14px] text-emerald-300">{message}</p>
+                  <p className="text-[14px] text-emerald-400">{message}</p>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
@@ -161,30 +148,12 @@ export function CommunitySection() {
                     onChange={e => setEmail(e.target.value)}
                     placeholder="your@email.com"
                     required
-                    className="flex-1 rounded-[10px] px-4 py-3 text-[14px] text-white outline-none transition-all font-mono"
-                    style={{
-                      background: "rgba(255,255,255,0.06)",
-                      border: "1px solid rgba(255,255,255,0.14)",
-                      // placeholder handled via ::placeholder — Tailwind class below
-                    }}
-                    // Tailwind placeholder opacity doesn't work well; inline style for placeholder handled by CSS class below
+                    className="flex-1 rounded-[10px] px-4 py-3 text-[14px] text-slate-100 outline-none transition-all font-mono bg-slate-950 border border-slate-800 focus:border-amber-500/50 placeholder:text-slate-600"
                   />
                   <button
                     type="submit"
                     disabled={status === "loading" || !email.trim()}
-                    className="px-6 py-3 text-white text-[14px] font-bold rounded-[10px] transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                    style={{
-                      background: "linear-gradient(135deg, #1a56db, #1e40af)",
-                      boxShadow: "0 4px 20px rgba(26,86,219,0.4)",
-                    }}
-                    onMouseEnter={e => {
-                      (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 6px 28px rgba(26,86,219,0.6)";
-                      (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
-                    }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 4px 20px rgba(26,86,219,0.4)";
-                      (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
-                    }}
+                    className="px-6 py-3 text-slate-950 text-[14px] font-bold rounded-[10px] transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap bg-amber-400 hover:bg-amber-300"
                   >
                     {status === "loading" ? "Joining…" : "Join the list"}
                   </button>
@@ -195,16 +164,14 @@ export function CommunitySection() {
                 <p className="text-[12px] text-red-400 mt-2">{message}</p>
               )}
 
-              {/* was text-white/20 — barely visible, raised to /40 */}
-              <p className="text-[11px] text-white/40 mt-4 font-mono">
+              <p className="text-[11px] text-slate-600 mt-4 font-mono">
                 No spam. Unsubscribe any time.
               </p>
             </div>
 
             {/* Right — Community links */}
             <div className="p-10">
-              {/* was text-white/30 — raised to /50 */}
-              <p className="font-mono text-[11px] text-white/50 uppercase tracking-widest mb-6">
+              <p className="font-mono text-[11px] text-slate-500 uppercase tracking-widest mb-6">
                 Join the community
               </p>
 
@@ -215,36 +182,24 @@ export function CommunitySection() {
                     href={href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`group flex items-center gap-4 p-4 rounded-[12px] transition-all ${color}`}
-                    style={{
-                      background: "rgba(255,255,255,0.04)",
-                      border: "1px solid rgba(255,255,255,0.10)",
-                    }}
+                    className={`group flex items-center gap-4 p-4 rounded-[12px] transition-all bg-slate-950 border border-slate-800 hover:border-slate-700 ${color}`}
                   >
                     <div className={`shrink-0 transition-colors ${iconColor}`}>{icon}</div>
                     <div>
-                      {/* was a single textColor for both label and sub — now split so label is bright, sub is readable */}
                       <p className={`text-[14px] font-semibold transition-colors ${labelColor}`}>{label}</p>
-                      {/* was text-white/30 — raised to /50 */}
-                      <p className="text-[12px] text-white/50">{sub}</p>
+                      <p className="text-[12px] text-slate-500">{sub}</p>
                     </div>
-                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-4 h-4 text-white/30 group-hover:text-white/55 ml-auto transition-colors">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-4 h-4 text-slate-600 group-hover:text-slate-400 ml-auto transition-colors">
                       <path d="M7 13L13 7M13 7H7M13 7v6" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </a>
                 ))}
               </div>
 
-              {/* Origin note — was text-white/35 + /55, raised both */}
-              <div
-                className="rounded-[12px] px-5 py-4"
-                style={{
-                  background: "rgba(255,255,255,0.03)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                }}
-              >
-                <p className="text-[12px] text-white/50 leading-relaxed">
-                  <span className="text-white/70 font-medium">Built in public from day one.</span>{" "}
+              {/* Origin note */}
+              <div className="rounded-[12px] px-5 py-4 bg-slate-950 border border-slate-800">
+                <p className="text-[12px] text-slate-400 leading-relaxed">
+                  <span className="text-slate-200 font-medium">Built in public from day one.</span>{" "}
                   Every resolver, every kernel decision, every compliance
                   framework — open source, auditable, and MIT licensed.
                   Africa surfaced the problems. The solutions belong to everyone.
