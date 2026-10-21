@@ -15,12 +15,14 @@ import { ScrollReveal } from "@/components/home/ScrollReveal";
 import { ApplicationsSection } from "@/components/home/ApplicationSection";
 import { ComparisonSection } from "@/components/home/Comparisonsection";
 import { CommunitySection } from "@/components/home/Communitysection";
-
+import { AgentDeveloperSection } from "@/components/home/AgentDeveloperSection";
 export default function HomePage() {
   return (
     <>
       {/* 1. Hook — who you are and why it matters */}
       <HeroSection />
+
+          <AgentDeveloperSection /> 
 
       {/* 2. Instant trust — social proof before any deep explanation */}
       <StatsStrip />

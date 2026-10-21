@@ -154,9 +154,9 @@ export function ApplicationsSection() {
           <p className="text-[13px] font-mono text-slate-500 uppercase tracking-widest mb-2">
             Built for complexity · Deployable everywhere
           </p>
-          <p className="text-[15px] text-slate-300 mb-5 max-w-[560px] mx-auto">
-            <span className="font-semibold text-slate-100">Integrate governed agent workflows into your existing stack in minutes.</span>{" "}
-            No framework lock-in. Works via REST API, Python/JS SDK, or as a middleware wrapper for LangChain/CrewAI.
+                  <p className="text-[15px] text-slate-300 mb-5 max-w-[560px] mx-auto">
+            <span className="font-semibold text-slate-100">Bring your own tools. We provide the governance.</span>{" "}
+            No ecosystem lock-in. Wrap your custom Python/JS functions, legacy APIs, or existing LangChain/CrewAI agents in minutes.
           </p>
           <div className="flex items-center justify-center gap-3 flex-wrap">
             <Link
