@@ -109,7 +109,7 @@ export function Navbar() {
                 {isOpen && (
                   <div className="absolute top-full left-0 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                     <div className="p-2 space-y-1">
-                      {item.items.map((subItem) => (
+                      {item.items?.map((subItem) => (
                         <Link
                           key={subItem.label}
                           href={subItem.href}
